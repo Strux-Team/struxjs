@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>StruxJS Framework</title>
+    @vite('resources/css/app.css', 'resources/js/app.js')
+</head>
+
+<body>
+
+    <header>
+        <h2>StruxJS</h2>
+    </header>
+
+    <main>
+        @slot('content')
+    </main>
+
+    <footer>
+        <p>&copy; 2026 StruxJS Framework. Powering elegant Node.js apps.</p>
+    </footer>
+
+</body>
+
+</html>

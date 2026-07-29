@@ -1,0 +1,38 @@
+{
+  "name": "my-strux-app",
+  "version": "1.0.0",
+  "description": "An enterprise backend application built on top of the StruxJS framework.",
+  "type": "module",
+  "main": "bootstrap.ts",
+  "scripts": {
+    "dev": "rm -rf dist && tsx watch bootstrap.ts",
+    "build": "rm -rf dist && tsc",
+    "start": "node dist/bootstrap.js",
+    "dev:assets": "VITE_DEV=true vite",
+    "build:assets": "vite build",
+    "preview:assets": "vite preview"
+  },
+  "keywords": [
+    "struxjs-app",
+    "backend",
+    "node",
+    "typescript"
+  ],
+  "author": "Your Name <your.email@example.com>",
+  "license": "MIT",
+  "dependencies": {
+    "@faker-js/faker": "^10.5.0",
+    "collect.js": "^4.36.1",
+    "mongodb": "^7.5.0",
+    "sqlite3": "^6.0.1",
+    "struxjs": "file:./struxjs-core-dev"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.11",
+    "@types/node": "^20.14.9",
+    "tailwindcss": "^4.1.11",
+    "tsx": "^4.16.2",
+    "typescript": "^5.5.2",
+    "vite": "latest"
+  }
+}

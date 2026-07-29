@@ -1,0 +1,17 @@
+@extends('layouts.app')
+
+@section('content')
+<div>
+    <h1>Welcome</h1>
+    <h2>
+        @if (auth().check())
+        Xin chào, {{ user.name }}!
+        <a href="/logout">Logout</a>
+        @else
+        Bạn chưa đăng nhập!
+
+        @endif
+    </h2>
+    <h1>{{ trans('auth.failed') }}</h1>
+</div>
+@endsection

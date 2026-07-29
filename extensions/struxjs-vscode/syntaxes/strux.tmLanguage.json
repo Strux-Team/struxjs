@@ -1,0 +1,68 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "StruxJS Template",
+  "scopeName": "text.html.strux",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#directives"
+    },
+    {
+      "include": "#interpolations"
+    },
+    {
+      "include": "text.html.basic"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.block.strux",
+          "begin": "\\{\\{--",
+          "end": "--\\}\\}",
+          "captures": {
+            "0": {
+              "name": "punctuation.definition.comment.strux"
+            }
+          }
+        }
+      ]
+    },
+    "directives": {
+      "patterns": [
+        {
+          "name": "keyword.control.strux",
+          "match": "@(extends|section|endsection|slot|include|includeIf|if|elseif|else|endif|unless|endunless|isset|endisset|empty|endempty|auth|endauth|guest|endguest|foreach|endforeach|forelse|endforelse|verbatim|endverbatim|php|endphp|csrf|method|checked|selected|disabled|readonly|required|json)\\b"
+        }
+      ]
+    },
+    "interpolations": {
+      "patterns": [
+        {
+          "name": "meta.embedded.expression.strux",
+          "begin": "\\{\\{|\\{!!",
+          "end": "\\}\\}|!!\\}",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.template-expression.begin.strux"
+            }
+          },
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.template-expression.end.strux"
+            }
+          },
+          "patterns": [
+            {
+              "name": "variable.other.readwrite.strux",
+              "match": "[a-zA-Z_$][a-zA-Z0-9_$.]*"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

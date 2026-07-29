@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WelcomeMail</title>
+   
+</head>
+<body>
+    <div class="wrapper">
+        <div class="header">
+            <h1>Welcome</h1>
+        </div>
+        <div class="body">
+            <p>Hello,</p>
+            <p><!-- Your email content here --></p>
+            <a href="#" class="btn">Get Started</a>
+        </div>
+        <div class="footer">
+            &copy; {{ new Date().getFullYear() }} Your Company. All rights reserved.
+        </div>
+    </div>
+</body>
+</html>

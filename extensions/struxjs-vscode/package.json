@@ -1,0 +1,43 @@
+{
+  "name": "struxjs-vscode",
+  "displayName": "StruxJS Template Engine Support",
+  "description": "Official syntax highlighting, code snippets, and language support for StruxJS (.strux) template files.",
+  "version": "1.0.0",
+  "publisher": "struxjs",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Snippets"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "strux",
+        "aliases": [
+          "Strux",
+          "StruxJS",
+          "strux"
+        ],
+        "extensions": [
+          ".strux"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "strux",
+        "scopeName": "text.html.strux",
+        "path": "./syntaxes/strux.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "strux",
+        "path": "./snippets/strux.json"
+      }
+    ]
+  }
+}
