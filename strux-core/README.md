@@ -1,125 +1,47 @@
-<p align="center">
-  <h1 align="center">StruxJS Framework</h1>
-</p>
+<div align="center">
+  <h1>StruxJS Core Engine</h1>
+</div>
 
 <p align="center">
-  <strong>An elegant, production-ready enterprise Node.js framework.</strong><br>
-  Built for speed with Fastify, designed for developer happiness with a Laravel-like architecture.
+  <strong>The underlying framework engine for StruxJS.</strong><br>
+  Built for speed with Fastify, designed for developer happiness.
 </p>
 
 ---
 
-## What is StruxJS?
+## What is this?
 
-StruxJS is a modern, TypeScript-first web framework that combines the blazing-fast performance of **Fastify** with the elegant, developer-friendly Developer Experience (DX) of frameworks like Laravel. It provides a robust architecture out-of-the-box, allowing you to focus on building features rather than wrestling with configuration.
+This repository contains the **Core Engine** of the StruxJS framework. It includes the IoC Container, the Active Record ORM, the HTTP Router (Fastify wrapper), and all fundamental services (Mail, Queue, Cache, Session, Broadcasting).
 
-### Key Features
-
-* **Blazing Fast HTTP:** Powered by Fastify under the hood for maximum throughput.
-* **IoC Container:** A powerful Dependency Injection container that manages class dependencies automatically.
-* **Active Record ORM:** An expressive `BaseModel` ORM inspired by Eloquent, supporting relationships, scopes, and aggregations.
-* **Concurrency Engine:** Built-in Multi-Core Cluster Engine and `ThreadPool` for heavy CPU-bound tasks without blocking the event loop.
-* **Authentication & Security:** Native support for CSRF protection, Rate Limiting (Throttle), Session Management, and JWT API Authentication.
-* **Background Jobs:** A robust Redis-backed Queue system with asynchronous workers.
-* **Event Broadcasting:** Built-in WebSocket broadcasting for real-time applications.
-* **Expressive Routing:** Clean and fluent routing API (`Route.get(...)`) with middleware and route groups.
-* **Vite Integration:** Seamless frontend asset bundling with Vite (`.strux` view engine included).
-
----
-
-## Requirements
-
-- **Node.js** v18.0 or higher
-- **Redis** (Optional, but highly recommended for Queue, Cache, and Session)
-- **Database** (MySQL, PostgreSQL, SQLite, or MongoDB)
-
----
-
-## Quick Start
-
-1. **Install dependencies:**
-   ```bash
-   npm install
-   ```
-
-2. **Configure Environment:**
-   Copy `.env.example` to `.env` and update your database/redis credentials.
-
-3. **Start the Development Server:**
-   ```bash
-   npm run dev
-   ```
-   *The server will start at `http://localhost:3000` (by default).*
-
-4. **Start the Frontend Asset Bundler (Vite):**
-   ```bash
-   npm run dev:assets
-   ```
-
-5. **Start a Background Queue Worker (Optional):**
-   ```bash
-   npx strux queue:work
-   ```
-
----
-
-## Documentation
-
-StruxJS provides extensive, well-organized documentation powered by VitePress. 
-
-To view the documentation locally:
-```bash
-cd docs-site
-npm install
-npm run dev
-```
-Then visit `http://localhost:5173` in your browser.
-
----
-
-## Directory Structure
-
-```text
-├── app/
-│   ├── Controllers/    # HTTP Route Controllers
-│   ├── Models/         # Active Record ORM Models
-│   ├── Middleware/     # Custom HTTP Middlewares
-│   ├── Jobs/           # Background Queue Jobs
-│   ├── Mail/           # Mailable Classes
-│   └── Providers/      # Service Providers (AppServiceProvider)
-├── bootstrap.ts        # Application Entry Point
-├── config/             # Configuration Files (DB, Cache, Queue, etc.)
-├── database/           # Migrations & Seeders
-├── docs-site/          # Official Documentation
-├── public/             # Publicly accessible assets
-├── resources/
-│   └── views/          # .strux HTML Templates
-├── routes/             # web.ts, api.ts, console.ts
-└── struxjs-core/       # The Core Framework Engine
-```
-
----
-
-## Command Line Interface (CLI)
-
-StruxJS includes an artisan-like CLI tool to speed up your workflow. Run `npx strux` in your terminal to see all available commands.
+**If you are looking to start a new StruxJS project, DO NOT install this package manually.** Instead, use our official scaffolding CLI:
 
 ```bash
-# Generate a new Controller
-npx strux make:controller UserController
-
-# Generate a new Model with Migration
-npx strux make:model Product -m
-
-# Run database migrations
-npx strux migrate
-
-# List all registered routes
-npx strux route:list
+npx create-struxjs-app my-awesome-project
 ```
+
+Visit the [Official Documentation](https://struxjs.vercel.app) to learn more about building applications with StruxJS.
+
+## Manual Installation
+
+If you are building an extension or a custom integration and need to install the core package directly:
+
+```bash
+npm install struxjs-core
+```
+
+## Contributing to the Core
+
+We welcome contributions to the StruxJS Core Engine! 
+
+1. Clone the main monorepo: `git clone https://github.com/Strux-Team/struxjs.git`
+2. Navigate to this package: `cd strux-core`
+3. Install dependencies from the root: `npm install`
+4. Compile your TypeScript changes: `npm run build`
+
+*For active local development, we recommend running the sandbox application at the root of the monorepo, which automatically live-reloads changes made to this core package.*
 
 ---
 
 ## License
 
-The StruxJS framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+The StruxJS Core is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
