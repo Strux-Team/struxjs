@@ -120,6 +120,19 @@ npx strux route:list
 
 ---
 
+## Developing the Core
+
+If you are modifying the framework's internal core (`strux-core`), you must compile the TypeScript files so the changes can be reflected in production environments:
+
+```bash
+cd strux-core
+npm run build
+```
+
+*Tip: During local development in the root application, changes to `strux-core` are live-reloaded automatically via `tsx` path mapping when you run `npm run dev`. You only need to build the core when preparing to test the built output or publishing to NPM.*
+
+---
+
 ## License
 
 The StruxJS framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
