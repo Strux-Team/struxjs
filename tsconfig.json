@@ -27,7 +27,7 @@
     /* Workspace Development Config */
     "baseUrl": ".",
     "paths": {
-      "struxjs": ["./struxjs-core-dev/src/index.ts"]
+      "struxjs": ["./strux-core/src/index.ts"]
     }
   },
   "include": [

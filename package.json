@@ -25,7 +25,7 @@
     "collect.js": "^4.36.1",
     "mongodb": "^7.5.0",
     "sqlite3": "^6.0.1",
-    "struxjs": "file:./struxjs-core-dev"
+    "struxjs": "file:./strux-core"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.11",
