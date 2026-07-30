@@ -1,0 +1,22 @@
+@extends('layouts.app')
+
+@section('content')
+<div class="bg-white overflow-hidden shadow sm:rounded-lg">
+    <div class="px-4 py-5 sm:p-6 text-center">
+        <h2 class="text-2xl font-semibold mb-4 text-indigo-600">Congratulations!</h2>
+        <p class="text-gray-600 mb-6">
+            Your StruxJS application is up and running. Build something amazing!
+        </p>
+        <div class="flex justify-center gap-4">
+            <a href="https://struxjs.vercel.app" target="_blank"
+                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">
+                Documentation
+            </a>
+            <a href="/api"
+                class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50">
+                Test API
+            </a>
+        </div>
+    </div>
+</div>
+@endsection

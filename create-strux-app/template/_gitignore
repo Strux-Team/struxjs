@@ -28,6 +28,7 @@ lerna-debug.log*
 
 # IDE and Editors
 .idea/
+.vscode/
 *.suo
 *.ntvs*
 *.njsproj
@@ -39,5 +40,4 @@ Thumbs.db
 # Vite compiled assets
 public/build/
 
-.github/
-.docs/
+.docs

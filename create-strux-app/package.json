@@ -1,0 +1,21 @@
+{
+  "name": "create-struxjs-app",
+  "version": "1.0.5",
+  "description": "Scaffolding CLI tool for generating a new StruxJS framework application.",
+  "type": "module",
+  "bin": {
+    "create-struxjs-app": "./index.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "struxjs",
+    "create",
+    "scaffold",
+    "cli",
+    "framework"
+  ],
+  "author": "Hoang An <hoangan.web@gmail.com>",
+  "license": "MIT"
+}

@@ -1,0 +1,77 @@
+{
+  "name": "struxjs-core",
+  "version": "1.0.4",
+  "description": "The elegant, production-ready core engine for the StruxJS framework, featuring a flexible IoC Container, Active Record ORM, and high-performance HTTP routing wrapped over Fastify.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "strux": "./dist/cli/index.js"
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc && cp -r src/core/http/errors dist/core/http/errors",
+    "lint": "eslint src --ext .ts",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "struxjs",
+    "core",
+    "backend",
+    "framework",
+    "ioc-container",
+    "active-record",
+    "orm",
+    "node",
+    "typescript"
+  ],
+  "author": "Your Name <your.email@example.com>",
+  "license": "MIT",
+  "dependencies": {
+    "@faker-js/faker": "^10.5.0",
+    "@fastify/cookie": "^8.3.0",
+    "@fastify/cors": "^8.5.0",
+    "@fastify/formbody": "^7.4.0",
+    "@fastify/multipart": "^8.3.1",
+    "@fastify/rate-limit": "^7.6.0",
+    "@fastify/static": "^7.0.4",
+    "@fastify/websocket": "^10.0.1",
+    "@types/nodemailer": "^6.4.17",
+    "@types/ws": "^8.18.1",
+    "bcryptjs": "^3.0.3",
+    "collect.js": "^4.36.1",
+    "commander": "^12.1.0",
+    "dotenv": "^16.4.5",
+    "fastify": "^4.28.1",
+    "ioredis": "^5.11.1",
+    "jsonwebtoken": "^9.0.3",
+    "knex": "^3.1.0",
+    "mongodb": "^7.5.0",
+    "mysql2": "^3.11.0",
+    "nodemailer": "^6.9.16",
+    "reflect-metadata": "^0.2.2",
+    "ws": "^8.21.1"
+  },
+  "devDependencies": {
+    "@swc/core": "^1.15.46",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^20.14.9",
+    "@typescript-eslint/eslint-plugin": "^8.65.0",
+    "@typescript-eslint/parser": "^8.65.0",
+    "eslint": "^10.8.0",
+    "typescript": "^5.5.2",
+    "unplugin-swc": "^1.5.9",
+    "vitest": "^4.1.10"
+  }
+}

@@ -1,0 +1,37 @@
+/*
+|--------------------------------------------------------------------------
+| StruxJS App Stylesheet
+|--------------------------------------------------------------------------
+| This file is the main CSS entry point compiled by Vite.
+|
+| Usage in .strux views:
+|   @vite('resources/css/app.css', 'resources/js/app.js')
+*/
+
+/* Tailwind CSS v4 */
+@import "tailwindcss";
+
+/* Scan .strux template files for Tailwind classes */
+@source "../../resources/views/**/*.strux";
+
+/*
+|--------------------------------------------------------------------------
+| Custom styles below — Tailwind utilities are available everywhere
+|--------------------------------------------------------------------------
+*/
+
+/* ---------------------------------------------------------- */
+/* Form Elements (extends Tailwind)                            */
+/* ---------------------------------------------------------- */
+.form-group { @apply mb-4; }
+
+.error-message { @apply text-xs text-red-500 mt-1; }
+
+/* ---------------------------------------------------------- */
+/* Alerts                                                      */
+/* ---------------------------------------------------------- */
+.alert        { @apply px-4 py-3 rounded-md text-sm mb-4 border; }
+.alert-success { @apply bg-emerald-50 text-emerald-800 border-emerald-200; }
+.alert-error   { @apply bg-red-50 text-red-800 border-red-200; }
+.alert-warning { @apply bg-yellow-50 text-yellow-800 border-yellow-200; }
+.alert-info    { @apply bg-blue-50 text-blue-800 border-blue-200; }

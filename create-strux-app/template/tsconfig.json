@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    /* Environment and Versions */
+    "target": "ES2022" /* Match the same modern JS standard as the Core */,
+    "module": "NodeNext" /* Use modern Node.js ES Modules (import/export) standard */,
+    "moduleResolution": "NodeNext" /* Use the latest module resolution algorithm for Node.js */,
+
+    /* Required Configuration for App Decorators */
+    "experimentalDecorators": true /* Enable decorators support for app Controllers and Services */,
+    "emitDecoratorMetadata": true /* Generate metadata so the Core IoC can scan App classes */,
+
+    /* Output and Input Directories */
+    "outDir": "./dist" /* Redirect app compilation output to its own dist directory */,
+    "rootDir": "./" /* Specify the root folder of the application code */,
+    "sourceMap": true /* Enable source maps for easy app-level debugging */,
+
+    /* Strict Type-Checking Options */
+    "strict": true /* Ensure high-quality, bug-free application code */,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+
+    /* Ecosystem and Interoperability Compatibility */
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true /* Crucial: Skips checking type files inside node_modules (including Core) to speed up compile time */
+  },
+  "include": [
+    "app/**/*" /* Scan all Controllers, Services, and Models */,
+    "config/**/*" /* Scan configuration files */,
+    "routes/**/*" /* Scan route files */,
+    "bootstrap.ts" /* Include the application entry point file */,
+    "bootstrap-cli.ts" /* Include CLI bootstrap for queue workers and schedulers */
+  ],
+  "exclude": ["node_modules", "dist"]
+}

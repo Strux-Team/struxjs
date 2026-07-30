@@ -1,0 +1,138 @@
+{
+  "Strux Extends": {
+    "prefix": "@extends",
+    "body": [
+      "@extends('${1:layouts.app}')"
+    ],
+    "description": "Extend layout in Strux template"
+  },
+  "Strux Section": {
+    "prefix": "@section",
+    "body": [
+      "@section('${1:content}')",
+      "    $0",
+      "@endsection"
+    ],
+    "description": "Define a section block in Strux template"
+  },
+  "Strux Slot": {
+    "prefix": "@slot",
+    "body": [
+      "@slot('${1:content}')"
+    ],
+    "description": "Define a slot yield in Strux layout"
+  },
+  "Strux Include": {
+    "prefix": "@include",
+    "body": [
+      "@include('${1:partials.header}')"
+    ],
+    "description": "Include subview in Strux template"
+  },
+  "Strux If": {
+    "prefix": "@if",
+    "body": [
+      "@if (${1:condition})",
+      "    $0",
+      "@endif"
+    ],
+    "description": "If directive in Strux template"
+  },
+  "Strux If Else": {
+    "prefix": "@ifelse",
+    "body": [
+      "@if (${1:condition})",
+      "    $2",
+      "@else",
+      "    $0",
+      "@endif"
+    ],
+    "description": "If-Else directive in Strux template"
+  },
+  "Strux Unless": {
+    "prefix": "@unless",
+    "body": [
+      "@unless (${1:condition})",
+      "    $0",
+      "@endunless"
+    ],
+    "description": "Unless directive in Strux template"
+  },
+  "Strux Isset": {
+    "prefix": "@isset",
+    "body": [
+      "@isset (${1:variable})",
+      "    $0",
+      "@endisset"
+    ],
+    "description": "Isset directive in Strux template"
+  },
+  "Strux Empty": {
+    "prefix": "@empty",
+    "body": [
+      "@empty (${1:variable})",
+      "    $0",
+      "@endempty"
+    ],
+    "description": "Empty directive in Strux template"
+  },
+  "Strux Auth": {
+    "prefix": "@auth",
+    "body": [
+      "@auth",
+      "    $0",
+      "@endauth"
+    ],
+    "description": "Auth user check directive"
+  },
+  "Strux Guest": {
+    "prefix": "@guest",
+    "body": [
+      "@guest",
+      "    $0",
+      "@endguest"
+    ],
+    "description": "Guest user check directive"
+  },
+  "Strux Foreach": {
+    "prefix": "@foreach",
+    "body": [
+      "@foreach (${1:items} as ${2:item})",
+      "    $0",
+      "@endforeach"
+    ],
+    "description": "Foreach directive in Strux template"
+  },
+  "Strux Forelse": {
+    "prefix": "@forelse",
+    "body": [
+      "@forelse (${1:items} as ${2:item})",
+      "    $3",
+      "@empty",
+      "    $0",
+      "@endforelse"
+    ],
+    "description": "Forelse directive in Strux template"
+  },
+  "Strux CSRF": {
+    "prefix": "@csrf",
+    "body": [
+      "@csrf"
+    ],
+    "description": "CSRF hidden input token"
+  },
+  "Strux Method": {
+    "prefix": "@method",
+    "body": [
+      "@method('${1:PUT}')"
+    ],
+    "description": "Form HTTP method spoofing"
+  },
+  "Strux JSON": {
+    "prefix": "@json",
+    "body": [
+      "@json(${1:variable})"
+    ],
+    "description": "Encode variable to JSON string"
+  }
+}

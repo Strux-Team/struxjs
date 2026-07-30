@@ -1,0 +1,9 @@
+{
+  "files.associations": {
+    "*.strux": "strux"
+  },
+  "emmet.includeLanguages": {
+    "strux": "html"
+  },
+  "html.autoClosingTags": true
+}

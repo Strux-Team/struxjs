@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - StruxJS</title>
+    @vite('resources/css/app.css')
+</head>
+
+<body class="bg-gray-50 text-gray-900 font-sans antialiased">
+    <div class="min-h-screen flex flex-col">
+        <header class="bg-white shadow">
+            <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex items-center gap-4">
+                <img src="/struxjs.png" alt="StruxJS Logo" class="w-10 h-10">
+                <h1 class="text-3xl font-bold leading-tight text-gray-900">
+                    StruxJS Framework
+                </h1>
+            </div>
+        </header>
+        <main class="flex-grow">
+            <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+                @slot('content')
+            </div>
+        </main>
+        <footer class="bg-white border-t border-gray-200 mt-auto">
+            <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 text-center text-gray-500 text-sm">
+                Powered by StruxJS
+            </div>
+        </footer>
+    </div>
+    @vite('resources/js/app.js')
+</body>
+
+</html>
