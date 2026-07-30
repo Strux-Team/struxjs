@@ -108,8 +108,8 @@ StruxJS includes an artisan-like CLI tool to speed up your workflow. Run `npx st
 # Generate a new Controller
 npx strux make:controller UserController
 
-# Generate a new Model with Migration
-npx strux make:model Product -m
+# Generate a new Model
+npx strux make:model Product
 
 # Run database migrations
 npx strux migrate
