@@ -28,7 +28,6 @@ lerna-debug.log*
 
 # IDE and Editors
 .idea/
-.vscode/
 *.suo
 *.ntvs*
 *.njsproj
@@ -40,4 +39,7 @@ Thumbs.db
 # Vite compiled assets
 public/build/
 
-.docs
+.github/
+.docs/
+create-strux-app/
+docs-site/

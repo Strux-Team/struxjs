@@ -1,0 +1,68 @@
+{
+  "Strux Extends": {
+    "scope": "html",
+    "prefix": "@extends",
+    "body": [
+      "@extends('${1:layouts.app}')"
+    ],
+    "description": "Extend layout in Strux template"
+  },
+  "Strux Section": {
+    "scope": "html",
+    "prefix": "@section",
+    "body": [
+      "@section('${1:content}')",
+      "    $0",
+      "@endsection"
+    ],
+    "description": "Define a section block in Strux template"
+  },
+  "Strux Slot": {
+    "scope": "html",
+    "prefix": "@slot",
+    "body": [
+      "@slot('${1:content}')"
+    ],
+    "description": "Define a slot yield in Strux layout"
+  },
+  "Strux If": {
+    "scope": "html",
+    "prefix": "@if",
+    "body": [
+      "@if (${1:condition})",
+      "    $0",
+      "@endif"
+    ],
+    "description": "If directive in Strux template"
+  },
+  "Strux If Else": {
+    "scope": "html",
+    "prefix": "@ifelse",
+    "body": [
+      "@if (${1:condition})",
+      "    $2",
+      "@else",
+      "    $0",
+      "@endif"
+    ],
+    "description": "If-Else directive in Strux template"
+  },
+  "Strux Foreach": {
+    "scope": "html",
+    "prefix": "@foreach",
+    "body": [
+      "@foreach (${1:items} as ${2:item})",
+      "    $0",
+      "@endforeach"
+    ],
+    "description": "Foreach directive in Strux template"
+  },
+  "Strux Echo": {
+    "scope": "html",
+    "prefix": "echo",
+    "body": [
+      "{{ ${1:variable} }}"
+    ],
+    "description": "Echo variable in Strux template"
+  }
+}
