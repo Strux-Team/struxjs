@@ -103,7 +103,7 @@ export default defineConfig({
     },
 
     socialLinks: [
-      { icon: "github", link: "https://github.com" }
+      { icon: "github", link: "https://github.com/Strux-Team" }
     ],
 
     footer: {
