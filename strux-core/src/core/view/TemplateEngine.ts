@@ -113,7 +113,11 @@ export class TemplateEngine {
             ];
 
             for (const entry of entrypoints) {
-                tags.push(`<script type="module" src="${viteHost}/${entry}"></script>`);
+                if (entry.match(/\.(css|scss|sass|less|styl)$/i)) {
+                    tags.push(`<link rel="stylesheet" href="${viteHost}/${entry}" />`);
+                } else {
+                    tags.push(`<script type="module" src="${viteHost}/${entry}"></script>`);
+                }
             }
 
             return tags.join("\n    ");

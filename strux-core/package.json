@@ -1,6 +1,6 @@
 {
   "name": "struxjs-core",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "The elegant, production-ready core engine for the StruxJS framework, featuring a flexible IoC Container, Active Record ORM, and high-performance HTTP routing wrapped over Fastify.",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
