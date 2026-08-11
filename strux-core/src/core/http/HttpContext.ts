@@ -677,22 +677,91 @@ export function redirect(url?: string, code?: number): RedirectResponse {
     return decoratedRep.redirect(url as any, code as any);
 }
 
+function getNestedValue(obj: any, path: string): any {
+    return path.split('.').reduce((acc, part) => (acc && typeof acc === 'object' ? acc[part] : undefined), obj);
+}
+
+function setNestedValue(obj: any, path: string, value: any): void {
+    const parts = path.split('.');
+    let current = obj;
+    for (let i = 0; i < parts.length - 1; i++) {
+        const part = parts[i];
+        if (!current[part] || typeof current[part] !== 'object') {
+            current[part] = isNaN(Number(parts[i+1])) ? {} : [];
+        }
+        current = current[part];
+    }
+    if (value !== undefined) {
+        current[parts[parts.length - 1]] = value;
+    }
+}
+
+function expandWildcardRules(
+    payload: any,
+    rules: Record<string, string | CustomRuleCallback[]>
+): Record<string, string | CustomRuleCallback[]> {
+    const expandedRules: Record<string, string | CustomRuleCallback[]> = {};
+
+    const resolveWildcards = (obj: any, parts: string[], currentPath: string, rule: any) => {
+        if (parts.length === 0) {
+            expandedRules[currentPath] = rule;
+            return;
+        }
+
+        const part = parts[0];
+        const remainingParts = parts.slice(1);
+
+        if (part === '*') {
+            if (Array.isArray(obj)) {
+                for (let i = 0; i < obj.length; i++) {
+                    const nextPath = currentPath ? `${currentPath}.${i}` : `${i}`;
+                    resolveWildcards(obj[i], remainingParts, nextPath, rule);
+                }
+            } else if (obj && typeof obj === 'object') {
+                for (const key of Object.keys(obj)) {
+                    const nextPath = currentPath ? `${currentPath}.${key}` : key;
+                    resolveWildcards(obj[key], remainingParts, nextPath, rule);
+                }
+            } else {
+                const nextPath = currentPath ? `${currentPath}.0` : '0';
+                resolveWildcards(undefined, remainingParts, nextPath, rule);
+            }
+        } else {
+            const nextObj = obj && typeof obj === 'object' ? obj[part] : undefined;
+            const nextPath = currentPath ? `${currentPath}.${part}` : part;
+            resolveWildcards(nextObj, remainingParts, nextPath, rule);
+        }
+    };
+
+    for (const [key, rule] of Object.entries(rules)) {
+        if (key.includes('*')) {
+            resolveWildcards(payload, key.split('.'), '', rule);
+        } else {
+            expandedRules[key] = rule;
+        }
+    }
+
+    return expandedRules;
+}
+
 /**
  * PRODUCTION-READY VALIDATION ENGINE WITH ALL POPULAR RULES AND ASYNC DB UNIQUE RULE
  */
 export async function validatePayload(
     payload: Record<string, any>,
-    rules: Record<string, string | CustomRuleCallback[]>,
+    rawRules: Record<string, string | CustomRuleCallback[]>,
     customMessages: Record<string, string> = {},
     customAttributes: Record<string, string> = {}
 ): Promise<Record<string, any>> {
     const errors: Record<string, string[]> = {};
-    const validatedData: Record<string, any> = {};
+    const validatedData: any = Array.isArray(payload) ? [] : {};
+
+    const rules = expandWildcardRules(payload, rawRules);
 
     for (const field of Object.keys(rules)) {
-        const value = payload[field];
+        const value = getNestedValue(payload, field);
         const rawRules = rules[field];
-        validatedData[field] = value;
+        setNestedValue(validatedData, field, value);
 
         const attributeName = customAttributes[field] || field;
 

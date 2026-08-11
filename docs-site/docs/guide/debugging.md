@@ -1,6 +1,6 @@
 # Debugging & Dump Helpers
 
-StruxJS provides Laravel-inspired `dump()` and `dd()` (Dump and Die) debugging helpers for rapid inspection of variables, Eloquent models, collections, query builders, and application state.
+StruxJS provides Laravel-inspired `dump()` and `dd()` (Dump and Die) debugging helpers for rapid inspection of variables, Strux Models, collections, query builders, and application state.
 
 ---
 
@@ -41,11 +41,11 @@ dd(user, "DEBUG_CHECK");
 
 ---
 
-## 3. Eloquent Model, Collection & Query Debugging
+## 3. Strux Model, Collection & Query Debugging
 
-Eloquent Models, Collections, and Query Builders feature built-in `.dump()` and `.dd()` instance methods.
+Strux Models, Collections, and Query Builders feature built-in `.dump()` and `.dd()` instance methods.
 
-### Debugging Eloquent Models
+### Debugging Strux Models
 
 ```typescript
 const user = await User.findOrFail(1);
@@ -71,7 +71,7 @@ users.dd();
 
 ### Debugging SQL Queries
 
-Call `.dd()` or `.dump()` directly on an `EloquentBuilder` instance to inspect the compiled SQL query string and parameter bindings:
+Call `.dd()` or `.dump()` directly on an `QueryBuilder` instance to inspect the compiled SQL query string and parameter bindings:
 
 ```typescript
 // Dumps { sql: "select * from `users` where `status` = ?", bindings: ["active"] }

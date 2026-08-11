@@ -50,14 +50,14 @@ export { Application } from "./core/Application.js";
 // Export Database Active Record ORM Core
 export { BaseModel } from "./core/database/BaseModel.js";
 export { MongoConnection } from "./core/database/MongoConnection.js";
-export { EloquentBuilder, PaginationResult, collect, Collection } from "./core/database/EloquentBuilder.js";
+export { QueryBuilder, PaginationResult, collect, Collection } from "./core/database/QueryBuilder.js";
 export { Relation } from "./core/database/relations/Relation.js";
 export { HasOne } from "./core/database/relations/HasOne.js";
 export { HasMany } from "./core/database/relations/HasMany.js";
 export { BelongsTo } from "./core/database/relations/BelongsTo.js";
 export { BelongsToMany } from "./core/database/relations/BelongsToMany.js";
 export { Schema } from "./core/database/schema/Schema.js";
-export { Blueprint } from "./core/database/schema/Blueprint.js";
+export { TableBuilder } from "./core/database/schema/TableBuilder.js";
 export { Migrator } from "./core/database/migrations/Migrator.js";
 export { Seeder } from "./core/database/seeders/Seeder.js";
 export { SeederRunner } from "./core/database/seeders/SeederRunner.js";

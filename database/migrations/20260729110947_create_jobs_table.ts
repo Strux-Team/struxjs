@@ -1,7 +1,7 @@
-import { Schema, Blueprint } from "struxjs";
+import { Schema, TableBuilder } from "struxjs";
 
 export async function up(): Promise<void> {
-    await Schema.create("jobs", (table: Blueprint) => {
+    await Schema.create("jobs", (table: TableBuilder) => {
         table.string("id", 36).primary();
         table.string("queue", 255).notNullable().defaultTo("default").index();
         table.text("payload").notNullable();

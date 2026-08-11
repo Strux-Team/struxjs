@@ -128,6 +128,48 @@ export class AuthController {
 
 ---
 
+## Nested Objects & Array Validation
+
+StruxJS fully supports validating deeply nested JSON objects and arrays using "dot" notation.
+
+### Validating Nested Objects
+
+If your incoming HTTP request contains a nested payload like `{"user": {"profile": {"age": 25}}}`, you can define rules targeting specific child properties using dots:
+
+```typescript
+public rules() {
+    return {
+        'user.profile.age': 'required|numeric|min:18'
+    };
+}
+```
+
+### Validating Arrays (Wildcards)
+
+You can validate arrays of data using the `*` wildcard character. For instance, to validate a list of emails inside an array of users `{"users": [{"email": "..."}]}`:
+
+```typescript
+public rules() {
+    return {
+        'users.*.email': 'required|email|unique:users,email'
+    };
+}
+```
+
+If your payload is just a simple array of values (e.g. `[1, 2, 3]`), you can validate each element directly using a single `*`:
+
+```typescript
+public rules() {
+    return {
+        '*': 'required|numeric|min:1'
+    };
+}
+```
+
+When retrieving the validated data via `request.validated()`, StruxJS will automatically reconstruct and return the exact nested Object or Array structure, perfectly sanitized.
+
+---
+
 ## Message Placeholders (`:attribute` and `:value`)
 
 StruxJS error messages support dynamic placeholders that are replaced during validation:

@@ -22,10 +22,10 @@
     /* Ecosystem and Interoperability Compatibility */
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
-    "skipLibCheck": true, /* Crucial: Skips checking type files inside node_modules (including Core) to speed up compile time */
-    
+    "skipLibCheck": true /* Crucial: Skips checking type files inside node_modules (including Core) to speed up compile time */,
+
     /* Workspace Development Config */
-    "baseUrl": ".",
+    // "baseUrl": ".",
     "paths": {
       "struxjs": ["./strux-core/src/index.ts"]
     }

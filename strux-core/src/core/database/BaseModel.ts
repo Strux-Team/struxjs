@@ -1,6 +1,6 @@
 import knex, { Knex } from "knex";
 import collect, { Collection } from "collect.js";
-import { EloquentBuilder, GlobalScopeCallback, PaginationResult } from "./EloquentBuilder.js";
+import { QueryBuilder, GlobalScopeCallback, PaginationResult, CursorPaginationResult } from "./QueryBuilder.js";
 import { HasOne } from "./relations/HasOne.js";
 import { HasMany } from "./relations/HasMany.js";
 import { BelongsTo } from "./relations/BelongsTo.js";
@@ -403,7 +403,7 @@ export abstract class BaseModel {
         const dummy = new (this as any)();
         if (dummy.softDelete === true) {
             const col: string = dummy.deletedAtColumn ?? "deleted_at";
-            (this as any).addGlobalScope("softDelete", (builder: EloquentBuilder<any>) => {
+            (this as any).addGlobalScope("softDelete", (builder: QueryBuilder<any>) => {
                 builder.whereNull(col);
             });
         }
@@ -558,22 +558,22 @@ export abstract class BaseModel {
     }
 
     /**
-     * Start a new Eloquent Query Builder for this Model
+     * Start a new Strux ORM Query Builder for this Model
      */
-    public static query<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, trx?: any): EloquentBuilder<T> {
+    public static query<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, trx?: any): QueryBuilder<T> {
         // Ensure boot() has been called for this model class (registers global scopes etc.)
         (this as any).ensureBooted();
 
         const dummyInstance = new (this as any)();
         const tableName = dummyInstance.table || `${dummyInstance.constructor.name.toLowerCase()}s`;
 
-        let builder: EloquentBuilder<T>;
+        let builder: QueryBuilder<T>;
 
         if (activeDriver === "mongodb") {
-            builder = new EloquentBuilder<T>(this, undefined, dummyInstance.primaryKey, "mongodb");
+            builder = new QueryBuilder<T>(this, undefined, dummyInstance.primaryKey, "mongodb");
         } else {
             const knexQuery = BaseModel.connection()(tableName);
-            builder = new EloquentBuilder<T>(this, knexQuery, dummyInstance.primaryKey, "sql");
+            builder = new QueryBuilder<T>(this, knexQuery, dummyInstance.primaryKey, "sql");
             if (trx) builder.transacting(trx);
         }
 
@@ -595,7 +595,7 @@ export abstract class BaseModel {
      * Usage: User.scope('active').get()
      *        User.scope('ofType', 'admin').get()
      */
-    public static scope<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, name: string, ...args: any[]): EloquentBuilder<T> {
+    public static scope<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, name: string, ...args: any[]): QueryBuilder<T> {
         return (this as any).query().scope(name, ...args);
     }
 
@@ -603,7 +603,7 @@ export abstract class BaseModel {
      * Exclude a specific global scope from this query.
      * Usage: User.withoutGlobalScope('active').get()
      */
-    public static withoutGlobalScope<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, name: string): EloquentBuilder<T> {
+    public static withoutGlobalScope<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, name: string): QueryBuilder<T> {
         return (this as any).query().withoutGlobalScope(name);
     }
 
@@ -612,167 +612,167 @@ export abstract class BaseModel {
      * Usage: User.withoutGlobalScopes().get()
      *        User.withoutGlobalScopes('active', 'verified').get()
      */
-    public static withoutGlobalScopes<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, ...names: string[]): EloquentBuilder<T> {
+    public static withoutGlobalScopes<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, ...names: string[]): QueryBuilder<T> {
         return (this as any).query().withoutGlobalScopes(...names);
     }
 
-    public static with<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, ...relations: string[]): EloquentBuilder<T> {
+    public static with<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, ...relations: string[]): QueryBuilder<T> {
         return (this as any).query().with(...relations);
     }
 
-    public static withCount<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, ...relations: string[]): EloquentBuilder<T> {
+    public static withCount<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, ...relations: string[]): QueryBuilder<T> {
         return (this as any).query().withCount(...relations);
     }
 
-    public static has<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, relationName: string): EloquentBuilder<T> {
+    public static has<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, relationName: string): QueryBuilder<T> {
         return (this as any).query().has(relationName);
     }
 
-    public static doesntHave<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, relationName: string): EloquentBuilder<T> {
+    public static doesntHave<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, relationName: string): QueryBuilder<T> {
         return (this as any).query().doesntHave(relationName);
     }
 
-    public static whereHas<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, relationName: string, callback?: (query: EloquentBuilder<any>) => void): EloquentBuilder<T> {
+    public static whereHas<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, relationName: string, callback?: (query: QueryBuilder<any>) => void): QueryBuilder<T> {
         return (this as any).query().whereHas(relationName, callback);
     }
 
-    public static orWhereHas<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, relationName: string, callback?: (query: EloquentBuilder<any>) => void): EloquentBuilder<T> {
+    public static orWhereHas<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, relationName: string, callback?: (query: QueryBuilder<any>) => void): QueryBuilder<T> {
         return (this as any).query().orWhereHas(relationName, callback);
     }
 
-    public static whereDoesntHave<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, relationName: string, callback?: (query: EloquentBuilder<any>) => void): EloquentBuilder<T> {
+    public static whereDoesntHave<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, relationName: string, callback?: (query: QueryBuilder<any>) => void): QueryBuilder<T> {
         return (this as any).query().whereDoesntHave(relationName, callback);
     }
 
-    public static where<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, column: string | Record<string, any> | ((...args: any[]) => any), operator?: any, value?: any): EloquentBuilder<T> {
+    public static where<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, column: string | Record<string, any> | ((...args: any[]) => any), operator?: any, value?: any): QueryBuilder<T> {
         return (this as any).query().where(column, operator, value);
     }
 
-    public static orWhere<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, column: string | Record<string, any>, operator?: any, value?: any): EloquentBuilder<T> {
+    public static orWhere<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, column: string | Record<string, any>, operator?: any, value?: any): QueryBuilder<T> {
         return (this as any).query().orWhere(column, operator, value);
     }
 
-    public static whereIn<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, column: string, values: any[] | EloquentBuilder | ((...args: any[]) => any)): EloquentBuilder<T> {
+    public static whereIn<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, column: string, values: any[] | QueryBuilder | ((...args: any[]) => any)): QueryBuilder<T> {
         return (this as any).query().whereIn(column, values);
     }
 
-    public static whereNotIn<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, column: string, values: any[] | EloquentBuilder | ((...args: any[]) => any)): EloquentBuilder<T> {
+    public static whereNotIn<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, column: string, values: any[] | QueryBuilder | ((...args: any[]) => any)): QueryBuilder<T> {
         return (this as any).query().whereNotIn(column, values);
     }
 
-    public static whereExists<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, callback: EloquentBuilder | ((...args: any[]) => any)): EloquentBuilder<T> {
+    public static whereExists<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, callback: QueryBuilder | ((...args: any[]) => any)): QueryBuilder<T> {
         return (this as any).query().whereExists(callback);
     }
 
-    public static whereNotExists<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, callback: EloquentBuilder | ((...args: any[]) => any)): EloquentBuilder<T> {
+    public static whereNotExists<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, callback: QueryBuilder | ((...args: any[]) => any)): QueryBuilder<T> {
         return (this as any).query().whereNotExists(callback);
     }
 
-    public static selectSub<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, subQuery: EloquentBuilder | ((...args: any[]) => any), alias: string): EloquentBuilder<T> {
+    public static selectSub<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, subQuery: QueryBuilder | ((...args: any[]) => any), alias: string): QueryBuilder<T> {
         return (this as any).query().selectSub(subQuery, alias);
     }
 
-    public static selectRaw<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, sql: string, bindings: any[] = []): EloquentBuilder<T> {
+    public static selectRaw<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, sql: string, bindings: any[] = []): QueryBuilder<T> {
         return (this as any).query().selectRaw(sql, bindings);
     }
 
-    public static whereRaw<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, sql: string, bindings: any[] = []): EloquentBuilder<T> {
+    public static whereRaw<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, sql: string, bindings: any[] = []): QueryBuilder<T> {
         return (this as any).query().whereRaw(sql, bindings);
     }
 
-    public static whereBetween<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, column: string, range: [any, any]): EloquentBuilder<T> {
+    public static whereBetween<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, column: string, range: [any, any]): QueryBuilder<T> {
         return (this as any).query().whereBetween(column, range);
     }
 
-    public static whereNotBetween<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, column: string, range: [any, any]): EloquentBuilder<T> {
+    public static whereNotBetween<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, column: string, range: [any, any]): QueryBuilder<T> {
         return (this as any).query().whereNotBetween(column, range);
     }
 
-    public static whereNull<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, column: string): EloquentBuilder<T> {
+    public static whereNull<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, column: string): QueryBuilder<T> {
         return (this as any).query().whereNull(column);
     }
 
-    public static whereNotNull<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, column: string): EloquentBuilder<T> {
+    public static whereNotNull<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, column: string): QueryBuilder<T> {
         return (this as any).query().whereNotNull(column);
     }
 
-    public static whereColumn<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, first: string, operatorOrSecond: string, second?: string): EloquentBuilder<T> {
+    public static whereColumn<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, first: string, operatorOrSecond: string, second?: string): QueryBuilder<T> {
         return (this as any).query().whereColumn(first, operatorOrSecond, second);
     }
 
-    public static fromSub<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, subQuery: EloquentBuilder | ((...args: any[]) => any), alias: string): EloquentBuilder<T> {
+    public static fromSub<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, subQuery: QueryBuilder | ((...args: any[]) => any), alias: string): QueryBuilder<T> {
         return (this as any).query().fromSub(subQuery, alias);
     }
 
-    public static when<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, value: any, callback: (builder: EloquentBuilder<T>, value: any) => void, defaultCallback?: (builder: EloquentBuilder<T>, value: any) => void): EloquentBuilder<T> {
+    public static when<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, value: any, callback: (builder: QueryBuilder<T>, value: any) => void, defaultCallback?: (builder: QueryBuilder<T>, value: any) => void): QueryBuilder<T> {
         return (this as any).query().when(value, callback, defaultCallback);
     }
 
-    public static unless<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, value: any, callback: (builder: EloquentBuilder<T>, value: any) => void, defaultCallback?: (builder: EloquentBuilder<T>, value: any) => void): EloquentBuilder<T> {
+    public static unless<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, value: any, callback: (builder: QueryBuilder<T>, value: any) => void, defaultCallback?: (builder: QueryBuilder<T>, value: any) => void): QueryBuilder<T> {
         return (this as any).query().unless(value, callback, defaultCallback);
     }
 
-    public static select<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, ...columns: string[]): EloquentBuilder<T> {
+    public static select<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, ...columns: string[]): QueryBuilder<T> {
         return (this as any).query().select(...columns);
     }
 
-    public static orderBy<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, column: string, direction: "asc" | "desc" = "asc"): EloquentBuilder<T> {
+    public static orderBy<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, column: string, direction: "asc" | "desc" = "asc"): QueryBuilder<T> {
         return (this as any).query().orderBy(column, direction);
     }
 
-    public static orderByRaw<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, sql: string, bindings: any[] = []): EloquentBuilder<T> {
+    public static orderByRaw<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, sql: string, bindings: any[] = []): QueryBuilder<T> {
         return (this as any).query().orderByRaw(sql, bindings);
     }
 
-    public static latest<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, column = "created_at"): EloquentBuilder<T> {
+    public static latest<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, column = "created_at"): QueryBuilder<T> {
         return (this as any).query().latest(column);
     }
 
-    public static oldest<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, column = "created_at"): EloquentBuilder<T> {
+    public static oldest<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, column = "created_at"): QueryBuilder<T> {
         return (this as any).query().oldest(column);
     }
 
-    public static limit<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, count: number): EloquentBuilder<T> {
+    public static limit<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, count: number): QueryBuilder<T> {
         return (this as any).query().limit(count);
     }
 
-    public static take<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, count: number): EloquentBuilder<T> {
+    public static take<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, count: number): QueryBuilder<T> {
         return (this as any).query().take(count);
     }
 
-    public static groupBy<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, ...columns: string[]): EloquentBuilder<T> {
+    public static groupBy<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, ...columns: string[]): QueryBuilder<T> {
         return (this as any).query().groupBy(...columns);
     }
 
-    public static having<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, column: string, operator?: any, value?: any): EloquentBuilder<T> {
+    public static having<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, column: string, operator?: any, value?: any): QueryBuilder<T> {
         return (this as any).query().having(column, operator, value);
     }
 
-    public static havingRaw<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, sql: string, bindings: any[] = []): EloquentBuilder<T> {
+    public static havingRaw<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, sql: string, bindings: any[] = []): QueryBuilder<T> {
         return (this as any).query().havingRaw(sql, bindings);
     }
 
-    public static whereRelation<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, relationName: string, column: string, operator?: any, value?: any): EloquentBuilder<T> {
+    public static whereRelation<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, relationName: string, column: string, operator?: any, value?: any): QueryBuilder<T> {
         return (this as any).query().whereRelation(relationName, column, operator, value);
     }
 
-    public static orWhereRelation<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, relationName: string, column: string, operator?: any, value?: any): EloquentBuilder<T> {
+    public static orWhereRelation<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, relationName: string, column: string, operator?: any, value?: any): QueryBuilder<T> {
         return (this as any).query().orWhereRelation(relationName, column, operator, value);
     }
 
-    public static withSum<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, relationName: string, column: string): EloquentBuilder<T> {
+    public static withSum<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, relationName: string, column: string): QueryBuilder<T> {
         return (this as any).query().withSum(relationName, column);
     }
 
-    public static withAvg<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, relationName: string, column: string): EloquentBuilder<T> {
+    public static withAvg<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, relationName: string, column: string): QueryBuilder<T> {
         return (this as any).query().withAvg(relationName, column);
     }
 
-    public static withMin<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, relationName: string, column: string): EloquentBuilder<T> {
+    public static withMin<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, relationName: string, column: string): QueryBuilder<T> {
         return (this as any).query().withMin(relationName, column);
     }
 
-    public static withMax<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, relationName: string, column: string): EloquentBuilder<T> {
+    public static withMax<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, relationName: string, column: string): QueryBuilder<T> {
         return (this as any).query().withMax(relationName, column);
     }
 
@@ -915,6 +915,29 @@ export abstract class BaseModel {
         return (this as any).query().paginate(perPage, pageNum);
     }
 
+    public static async chunk<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, count: number, callback: (models: Collection<T>, page: number) => boolean | void | Promise<boolean | void>): Promise<void> {
+        return (this as any).query().chunk(count, callback);
+    }
+
+    public static lazy<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, chunkSize: number = 1000): AsyncGenerator<T, void, unknown> {
+        return (this as any).query().lazy(chunkSize);
+    }
+
+    public static async cursorPaginate<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, perPage = 15, cursorColumn = 'id', direction: 'asc' | 'desc' = 'asc', currentCursor: string | null = null): Promise<CursorPaginationResult<T>> {
+        let cursor = currentCursor;
+        if (!cursor) {
+            try {
+                const { request } = await import("../http/HttpContext.js");
+                const req = request() as any;
+                if (req.query?.cursor) {
+                    cursor = String(req.query.cursor);
+                }
+            } catch {
+            }
+        }
+        return (this as any).query().cursorPaginate(perPage, cursorColumn, direction, cursor);
+    }
+
     public static async destroy<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T, ids: any | any[]): Promise<number> {
         const dummyInstance = new (this as any)();
         const primaryKey = dummyInstance.primaryKey;
@@ -942,7 +965,7 @@ export abstract class BaseModel {
      *
      * Post.withTrashed().get()
      */
-    public static withTrashed<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T): EloquentBuilder<T> {
+    public static withTrashed<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T): QueryBuilder<T> {
         return (this as any).query().withTrashed();
     }
 
@@ -951,7 +974,7 @@ export abstract class BaseModel {
      *
      * Post.onlyTrashed().get()
      */
-    public static onlyTrashed<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T): EloquentBuilder<T> {
+    public static onlyTrashed<T extends BaseModel>(this: new (attrs?: Record<string, any>) => T): QueryBuilder<T> {
         return (this as any).query().onlyTrashed();
     }
 

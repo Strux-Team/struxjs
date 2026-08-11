@@ -387,16 +387,16 @@ const posts = await Post.withoutGlobalScopes("published", "active").get();
 Local scopes are reusable query constraints defined as methods prefixed with `scope` on the model. They are applied on demand using `.scope()`:
 
 ```typescript
-import { BaseModel, EloquentBuilder } from "struxjs";
+import { BaseModel, QueryBuilder } from "struxjs";
 
 export class Post extends BaseModel {
     protected table = "posts";
 
-    public scopePublished(builder: EloquentBuilder<Post>) {
+    public scopePublished(builder: QueryBuilder<Post>) {
         builder.where("status", "published");
     }
 
-    public scopeOfType(builder: EloquentBuilder<Post>, type: string) {
+    public scopeOfType(builder: QueryBuilder<Post>, type: string) {
         builder.where("type", type);
     }
 }

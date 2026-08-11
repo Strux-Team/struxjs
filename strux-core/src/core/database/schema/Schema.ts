@@ -1,12 +1,12 @@
 import { BaseModel } from "../BaseModel.js";
 import { MongoConnection } from "../MongoConnection.js";
-import { Blueprint } from "./Blueprint.js";
+import { TableBuilder } from "./TableBuilder.js";
 
 export class Schema {
     /**
      * Create a new database table or collection
      */
-    public static async create(tableName: string, callback: (table: Blueprint) => void): Promise<void> {
+    public static async create(tableName: string, callback: (table: TableBuilder) => void): Promise<void> {
         const driver = BaseModel.getActiveDriver();
 
         if (driver === "mongodb") {
@@ -17,7 +17,7 @@ export class Schema {
 
         const db = BaseModel.connection();
         await db.schema.createTable(tableName, (knexTable) => {
-            const blueprint = new Blueprint(knexTable);
+            const blueprint = new TableBuilder(knexTable);
             callback(blueprint);
         });
     }
@@ -25,13 +25,13 @@ export class Schema {
     /**
      * Modify an existing database table schema
      */
-    public static async table(tableName: string, callback: (table: Blueprint) => void): Promise<void> {
+    public static async table(tableName: string, callback: (table: TableBuilder) => void): Promise<void> {
         const driver = BaseModel.getActiveDriver();
         if (driver === "mongodb") return;
 
         const db = BaseModel.connection();
         await db.schema.table(tableName, (knexTable) => {
-            const blueprint = new Blueprint(knexTable);
+            const blueprint = new TableBuilder(knexTable);
             callback(blueprint);
         });
     }

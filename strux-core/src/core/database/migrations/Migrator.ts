@@ -3,7 +3,7 @@ import path from "path";
 import { pathToFileURL } from "url";
 import { BaseModel } from "../BaseModel.js";
 import { Schema } from "../schema/Schema.js";
-import { Blueprint } from "../schema/Blueprint.js";
+import { TableBuilder } from "../schema/TableBuilder.js";
 
 export interface MigrationFile {
     name: string;
@@ -25,7 +25,7 @@ export class Migrator {
     private async prepareTrackingTable(): Promise<void> {
         const hasTable = await Schema.hasTable("migrations");
         if (!hasTable) {
-            await Schema.create("migrations", (table: Blueprint) => {
+            await Schema.create("migrations", (table: TableBuilder) => {
                 table.id();
                 table.string("migration");
                 table.integer("batch");
@@ -257,11 +257,11 @@ export class Migrator {
         const matchTable = name.match(/create_(.*?)_table/) || name.match(/_to_(.*?)_table/) || name.match(/_in_(.*?)_table/);
         const tableName = matchTable ? (matchTable[1] || matchTable[2] || matchTable[3]) : "table_name";
 
-        const content = isCreateTable ? `import { Schema, Blueprint } from "struxjs";
+        const content = isCreateTable ? `import { Schema, TableBuilder } from "struxjs";
 
 export default {
     async up() {
-        await Schema.create("${tableName}", (table: Blueprint) => {
+        await Schema.create("${tableName}", (table: TableBuilder) => {
             table.id();
             table.timestamps();
         });
@@ -271,17 +271,17 @@ export default {
         await Schema.dropIfExists("${tableName}");
     }
 };
-` : `import { Schema, Blueprint } from "struxjs";
+` : `import { Schema, TableBuilder } from "struxjs";
 
 export default {
     async up() {
-        await Schema.table("${tableName}", (table: Blueprint) => {
+        await Schema.table("${tableName}", (table: TableBuilder) => {
             // Add columns here
         });
     },
 
     async down() {
-        await Schema.table("${tableName}", (table: Blueprint) => {
+        await Schema.table("${tableName}", (table: TableBuilder) => {
             // Rollback changes here
         });
     }

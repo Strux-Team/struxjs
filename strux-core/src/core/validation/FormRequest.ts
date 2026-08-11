@@ -95,7 +95,8 @@ export abstract class FormRequest {
      * Dynamically fetch inputs directly from the validated request object
      */
     public input(key: string, defaultValue: any = null): any {
-        return this.validatedData[key] !== undefined ? this.validatedData[key] : defaultValue;
+        const value = key.split('.').reduce((acc, part) => (acc && typeof acc === 'object' ? acc[part] : undefined), this.validatedData);
+        return value !== undefined ? value : defaultValue;
     }
 
     /**

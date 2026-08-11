@@ -25,11 +25,11 @@ npx strux make:migration create_users_table
 Generated file (`database/migrations/20260727102146_create_users_table.ts`):
 
 ```typescript
-import { Schema, Blueprint } from "struxjs";
+import { Schema, TableBuilder } from "struxjs";
 
 export default {
     async up() {
-        await Schema.create("users", (table: Blueprint) => {
+        await Schema.create("users", (table: TableBuilder) => {
             table.id();
             table.timestamps();
         });
@@ -52,17 +52,17 @@ npx strux make:migration add_views_to_posts_table
 Generated file:
 
 ```typescript
-import { Schema, Blueprint } from "struxjs";
+import { Schema, TableBuilder } from "struxjs";
 
 export default {
     async up() {
-        await Schema.table("posts", (table: Blueprint) => {
+        await Schema.table("posts", (table: TableBuilder) => {
             // Add columns here
         });
     },
 
     async down() {
-        await Schema.table("posts", (table: Blueprint) => {
+        await Schema.table("posts", (table: TableBuilder) => {
             // Reverse changes here
         });
     }
@@ -221,10 +221,10 @@ The `Schema` class is the facade used inside migration files to create, modify, 
 
 ### `Schema.create(table, callback)`
 
-Creates a new table. The callback receives a `Blueprint` instance for defining columns:
+Creates a new table. The callback receives a `TableBuilder` instance for defining columns:
 
 ```typescript
-await Schema.create("products", (table: Blueprint) => {
+await Schema.create("products", (table: TableBuilder) => {
     table.id();
     table.string("name");
     table.decimal("price", 10, 2);
@@ -237,7 +237,7 @@ await Schema.create("products", (table: Blueprint) => {
 Modifies an existing table by adding, changing, or removing columns:
 
 ```typescript
-await Schema.table("products", (table: Blueprint) => {
+await Schema.table("products", (table: TableBuilder) => {
     table.boolean("is_featured").defaultTo(false);
 });
 ```
@@ -284,9 +284,9 @@ if (await Schema.hasColumn("users", "email_verified_at")) {
 
 ---
 
-## Blueprint Column Types
+## TableBuilder Column Types
 
-The `Blueprint` instance passed to `Schema.create` and `Schema.table` provides the following column definition methods.
+The `TableBuilder` instance passed to `Schema.create` and `Schema.table` provides the following column definition methods.
 
 ### Primary Keys
 
@@ -362,7 +362,7 @@ table.string("title", 500).change();  // Modify an existing column
 ### Adding indexes
 
 ```typescript
-await Schema.table("posts", (table: Blueprint) => {
+await Schema.table("posts", (table: TableBuilder) => {
     table.index("user_id");
     table.unique(["email", "tenant_id"], "unique_email_per_tenant");
 });
@@ -410,7 +410,7 @@ Use `Schema.table` with the `.change()` modifier to alter an existing column's d
 
 ```typescript
 // Change the length of an existing VARCHAR column
-await Schema.table("posts", (table: Blueprint) => {
+await Schema.table("posts", (table: TableBuilder) => {
     table.string("title", 500).change();
 });
 ```
@@ -419,7 +419,7 @@ To reverse it in the `down` function:
 
 ```typescript
 async down() {
-    await Schema.table("posts", (table: Blueprint) => {
+    await Schema.table("posts", (table: TableBuilder) => {
         table.string("title", 255).change();
     });
 }
@@ -432,7 +432,7 @@ async down() {
 ### Renaming a column
 
 ```typescript
-await Schema.table("posts", (table: Blueprint) => {
+await Schema.table("posts", (table: TableBuilder) => {
     table.renameColumn("title", "subject");
 });
 ```
@@ -440,7 +440,7 @@ await Schema.table("posts", (table: Blueprint) => {
 ### Dropping a single column
 
 ```typescript
-await Schema.table("posts", (table: Blueprint) => {
+await Schema.table("posts", (table: TableBuilder) => {
     table.dropColumn("slug");
 });
 ```
@@ -448,7 +448,7 @@ await Schema.table("posts", (table: Blueprint) => {
 ### Dropping multiple columns
 
 ```typescript
-await Schema.table("posts", (table: Blueprint) => {
+await Schema.table("posts", (table: TableBuilder) => {
     table.dropColumns("views", "slug", "excerpt");
 });
 ```
@@ -460,11 +460,11 @@ await Schema.table("posts", (table: Blueprint) => {
 ### Creating a table with relationships
 
 ```typescript
-import { Schema, Blueprint } from "struxjs";
+import { Schema, TableBuilder } from "struxjs";
 
 export default {
     async up() {
-        await Schema.create("posts", (table: Blueprint) => {
+        await Schema.create("posts", (table: TableBuilder) => {
             table.id();
             table.foreignId("user_id").constrained("users").onDelete("cascade");
             table.string("title");
@@ -485,18 +485,18 @@ export default {
 ### Adding columns to an existing table
 
 ```typescript
-import { Schema, Blueprint } from "struxjs";
+import { Schema, TableBuilder } from "struxjs";
 
 export default {
     async up() {
-        await Schema.table("posts", (table: Blueprint) => {
+        await Schema.table("posts", (table: TableBuilder) => {
             table.integer("views").defaultTo(0);
             table.string("slug").nullable();
         });
     },
 
     async down() {
-        await Schema.table("posts", (table: Blueprint) => {
+        await Schema.table("posts", (table: TableBuilder) => {
             table.dropColumn("views");
             table.dropColumn("slug");
         });
@@ -507,17 +507,17 @@ export default {
 ### Renaming a column
 
 ```typescript
-import { Schema, Blueprint } from "struxjs";
+import { Schema, TableBuilder } from "struxjs";
 
 export default {
     async up() {
-        await Schema.table("posts", (table: Blueprint) => {
+        await Schema.table("posts", (table: TableBuilder) => {
             table.renameColumn("title", "subject");
         });
     },
 
     async down() {
-        await Schema.table("posts", (table: Blueprint) => {
+        await Schema.table("posts", (table: TableBuilder) => {
             table.renameColumn("subject", "title");
         });
     }

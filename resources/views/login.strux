@@ -8,7 +8,8 @@
     <div>
         <input type="password" name="password" placeholder="Password..." />
     </div>
-    <button>Submit</button>
+    <button class="text">Submit</button>
+    <div class="content"></div>
     @csrf
 </form>
 @endsection

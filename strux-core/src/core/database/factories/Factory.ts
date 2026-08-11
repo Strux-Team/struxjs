@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { faker, Faker } from "@faker-js/faker";
 import { BaseModel } from "../BaseModel.js";
-import { collect, Collection } from "../EloquentBuilder.js";
+import { collect, Collection } from "../QueryBuilder.js";
 
 export abstract class Factory<T extends BaseModel> {
     protected model!: new () => T;

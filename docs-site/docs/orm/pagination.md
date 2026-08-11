@@ -20,6 +20,38 @@ const pageTwoUsers = await User.paginate(10, 2);
 
 ---
 
+## Cursor Pagination (Keyset Pagination)
+
+When paginating large datasets (e.g. millions of rows), offset-based pagination (`paginate()`) becomes extremely slow due to database `COUNT(*)` queries. StruxJS ORM provides `cursorPaginate()` for ultra-fast, index-based pagination.
+
+```typescript
+// Paginate 15 items per page, ordered by the 'id' column descending
+// (Automatically handles the ?cursor= parameter if you use URL query strings)
+const users = await User.cursorPaginate(15, 'id', 'desc', request.query.cursor);
+```
+
+In `.strux` views, cursor paginators support the exact same `links()` method, rendering simple "Previous" and "Next" buttons instead of page numbers:
+
+```html
+<div class="mt-4">
+    {!! users.links() !!}
+    {!! users.links('bootstrap') !!}
+</div>
+```
+
+When returned as JSON, it includes the base64 encoded cursor strings:
+
+```json
+{
+  "data": [...],
+  "per_page": 15,
+  "next_cursor": "eyJ2YWx1ZSI6OTg3fQ==",
+  "prev_cursor": null
+}
+```
+
+---
+
 ## Metadata Properties
 
 The `PaginationResult` instance exposes metadata properties describing the dataset:

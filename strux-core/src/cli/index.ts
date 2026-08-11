@@ -706,10 +706,10 @@ program
         const { Migrator } = await import("../core/database/migrations/Migrator.js");
         const filePath = Migrator.make(`create_${options.table}_table`);
 
-        const schema = `import { Schema, Blueprint } from "struxjs";
+        const schema = `import { Schema, TableBuilder } from "struxjs";
 
 export async function up(): Promise<void> {
-    await Schema.create("${options.table}", (table: Blueprint) => {
+    await Schema.create("${options.table}", (table: TableBuilder) => {
         table.string("key", 255).primary();
         table.text("value").notNullable();
         table.bigInteger("expires_at").nullable().defaultTo(null).index();
@@ -1026,10 +1026,10 @@ program
         const failedPath = Migrator.make(`create_${options.failedTable}_table`);
 
         // Overwrite with queue-specific schema
-        const jobsSchema = `import { Schema, Blueprint } from "struxjs";
+        const jobsSchema = `import { Schema, TableBuilder } from "struxjs";
 
 export async function up(): Promise<void> {
-    await Schema.create("${options.jobsTable}", (table: Blueprint) => {
+    await Schema.create("${options.jobsTable}", (table: TableBuilder) => {
         table.string("id", 36).primary();
         table.string("queue", 255).notNullable().defaultTo("default").index();
         table.text("payload").notNullable();
@@ -1045,10 +1045,10 @@ export async function down(): Promise<void> {
 }
 `;
 
-        const failedSchema = `import { Schema, Blueprint } from "struxjs";
+        const failedSchema = `import { Schema, TableBuilder } from "struxjs";
 
 export async function up(): Promise<void> {
-    await Schema.create("${options.failedTable}", (table: Blueprint) => {
+    await Schema.create("${options.failedTable}", (table: TableBuilder) => {
         table.string("id", 36).primary();
         table.string("queue", 255).notNullable().index();
         table.text("payload").notNullable();

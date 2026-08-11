@@ -1,6 +1,6 @@
 import { Knex } from "knex";
 
-export class Blueprint {
+export class TableBuilder {
     private tableBuilder: any;
 
     constructor(tableBuilder: any) {

@@ -1,8 +1,8 @@
-import { Schema, Blueprint } from "struxjs";
+import { Schema, TableBuilder } from "struxjs";
 
 export default {
     async up() {
-        await Schema.create("users", (table: Blueprint) => {
+        await Schema.create("users", (table: TableBuilder) => {
             table.id();
             table.string('name').nullable();
             table.string('email').unique();

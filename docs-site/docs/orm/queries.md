@@ -71,7 +71,7 @@ StruxJS allows nesting subqueries directly inside `where`, `whereIn`, `selectSub
 
 ### 1. Subquery Value Comparison
 
-Pass an `EloquentBuilder` instance as a comparison value:
+Pass an `QueryBuilder` instance as a comparison value:
 
 ```typescript
 // Select users whose account balance exceeds the average balance of all users
@@ -229,6 +229,35 @@ const subset = await User.orderBy("id", "asc")
     .get();
 ```
 
+### Chunking & Lazy Evaluation
+
+When processing thousands of database records, using `.get()` will load all records into RAM simultaneously. Instead, use `.chunk()` or `.lazy()` to fetch a small subset of records at a time, keeping memory usage extremely low.
+
+**Using `chunk()`**
+
+```typescript
+await User.where("status", "active").chunk(200, async (users, page) => {
+    // Process 200 users at a time
+    for (const user of users) {
+        await emailService.send(user);
+    }
+    
+    // Return false to stop chunking early
+    // return false; 
+});
+```
+
+**Using `lazy()`**
+
+Returns an `AsyncGenerator` allowing you to iterate over massive datasets seamlessly while StruxJS manages chunking under the hood:
+
+```typescript
+// Fetches 1000 records at a time behind the scenes
+for await (const user of User.lazy(1000)) {
+    console.log(user.name);
+}
+```
+
 ---
 
 ## Query Scopes
@@ -242,11 +271,11 @@ Define reusable model query filters by prefixing method names with `scope`:
 export class User extends BaseModel {
     protected static table = "users";
 
-    public scopeActive(query: EloquentBuilder) {
+    public scopeActive(query: QueryBuilder) {
         return query.where("status", "active");
     }
 
-    public scopeOfType(query: EloquentBuilder, type: string) {
+    public scopeOfType(query: QueryBuilder, type: string) {
         return query.where("type", type);
     }
 }

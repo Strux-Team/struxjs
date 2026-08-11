@@ -1,5 +1,5 @@
 import { BaseModel } from "../BaseModel.js";
-import { EloquentBuilder } from "../EloquentBuilder.js";
+import { QueryBuilder } from "../QueryBuilder.js";
 
 export abstract class Relation {
     constructor(
@@ -26,7 +26,7 @@ export abstract class Relation {
         });
     }
 
-    public abstract query(): EloquentBuilder<any>;
+    public abstract query(): QueryBuilder<any>;
 
     public async get(): Promise<any> {
         return this.query().get();
@@ -36,7 +36,7 @@ export abstract class Relation {
         return this.query().first();
     }
 
-    public where(column: string | Record<string, any>, operator?: any, value?: any): EloquentBuilder<any> {
+    public where(column: string | Record<string, any>, operator?: any, value?: any): QueryBuilder<any> {
         return this.query().where(column, operator, value);
     }
 

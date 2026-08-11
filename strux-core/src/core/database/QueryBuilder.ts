@@ -312,9 +312,104 @@ export class PaginationResult<T> {
 }
 
 // Signature for a global scope: a callback that receives the builder
-export type GlobalScopeCallback<T extends BaseModel = any> = (builder: EloquentBuilder<T>) => void;
+export type GlobalScopeCallback<T extends BaseModel = any> = (builder: QueryBuilder<T>) => void;
+export class CursorPaginationResult<T> {
+    public data: Collection<T>;
+    public perPage: number;
+    public nextCursor: string | null;
+    public prevCursor: string | null;
 
-export class EloquentBuilder<T extends BaseModel = any> {
+    constructor(data: Collection<T>, perPage: number, nextCursor: string | null, prevCursor: string | null) {
+        this.data = data;
+        this.perPage = perPage;
+        this.nextCursor = nextCursor;
+        this.prevCursor = prevCursor;
+    }
+
+    public *[Symbol.iterator](): Iterator<T> {
+        const items = this.data.all();
+        for (const item of items) {
+            yield item;
+        }
+    }
+
+    public all(): T[] {
+        return this.data.all();
+    }
+
+    public map<U>(callback: (item: T, index: number) => U): U[] {
+        return this.data.all().map(callback);
+    }
+
+    public toJSON() {
+        return {
+            data: this.data.map(item => (typeof (item as any).toJSON === 'function' ? (item as any).toJSON() : item)),
+            per_page: this.perPage,
+            next_cursor: this.nextCursor,
+            prev_cursor: this.prevCursor,
+        };
+    }
+
+    public nextPageUrl(): string | null {
+        if (!this.nextCursor) return null;
+        return this.buildUrl(this.nextCursor);
+    }
+
+    public previousPageUrl(): string | null {
+        if (!this.prevCursor) return null;
+        return this.buildUrl(this.prevCursor);
+    }
+
+    private buildUrl(cursor: string): string {
+        try {
+            const store = httpContextStorage.getStore();
+            if (!store) return `?cursor=${encodeURIComponent(cursor)}`;
+
+            const req = store.request as any;
+            const rawUrl = req.raw?.url ?? req.url ?? '';
+            const baseUrl = rawUrl.split('?')[0];
+
+            const currentQuery = rawUrl.split('?')[1] || '';
+            const params = new URLSearchParams(currentQuery);
+            params.set('cursor', cursor);
+            return `${baseUrl}?${params.toString()}`;
+        } catch {
+            return `?cursor=${encodeURIComponent(cursor)}`;
+        }
+    }
+
+    public links(styleOrView: string = 'tailwind'): string {
+        const nextUrl = this.nextPageUrl();
+        const prevUrl = this.previousPageUrl();
+
+        if (!nextUrl && !prevUrl) return '';
+
+        if (styleOrView === 'bootstrap') {
+            return `
+            <ul class="pagination">
+                <li class="page-item ${!prevUrl ? 'disabled' : ''}">
+                    <a class="page-link" href="${prevUrl || '#'}">&laquo; Previous</a>
+                </li>
+                <li class="page-item ${!nextUrl ? 'disabled' : ''}">
+                    <a class="page-link" href="${nextUrl || '#'}">Next &raquo;</a>
+                </li>
+            </ul>`;
+        }
+
+        // Default Tailwind
+        return `
+        <nav class="flex items-center justify-between">
+            <a href="${prevUrl || '#'}" class="relative inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 ${!prevUrl ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}">
+                Previous
+            </a>
+            <a href="${nextUrl || '#'}" class="relative inline-flex items-center px-4 py-2 ml-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 ${!nextUrl ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}">
+                Next
+            </a>
+        </nav>`;
+    }
+}
+
+export class QueryBuilder<T extends BaseModel = any> {
     private query!: Knex.QueryBuilder;
     private modelClass: new (attrs?: Record<string, any>) => T;
     private primaryKey: string;
@@ -533,7 +628,7 @@ export class EloquentBuilder<T extends BaseModel = any> {
     /**
      * Filter models where relationship exists matching conditions
      */
-    public whereHas(relationName: string, callback?: (query: EloquentBuilder) => void): this {
+    public whereHas(relationName: string, callback?: (query: QueryBuilder) => void): this {
         if (this.driver === "sql") {
             const subQuery = this.buildRelationSubQuery(relationName, callback);
             this.query.whereExists(subQuery);
@@ -544,7 +639,7 @@ export class EloquentBuilder<T extends BaseModel = any> {
     /**
      * OR Filter models where relationship exists matching conditions
      */
-    public orWhereHas(relationName: string, callback?: (query: EloquentBuilder) => void): this {
+    public orWhereHas(relationName: string, callback?: (query: QueryBuilder) => void): this {
         if (this.driver === "sql") {
             const subQuery = this.buildRelationSubQuery(relationName, callback);
             this.query.orWhereExists(subQuery);
@@ -555,7 +650,7 @@ export class EloquentBuilder<T extends BaseModel = any> {
     /**
      * Filter models where relationship does NOT exist matching conditions
      */
-    public whereDoesntHave(relationName: string, callback?: (query: EloquentBuilder) => void): this {
+    public whereDoesntHave(relationName: string, callback?: (query: QueryBuilder) => void): this {
         if (this.driver === "sql") {
             const subQuery = this.buildRelationSubQuery(relationName, callback);
             this.query.whereNotExists(subQuery);
@@ -614,7 +709,7 @@ export class EloquentBuilder<T extends BaseModel = any> {
     /**
      * Helper to construct subquery for relationship queries (whereHas, withCount)
      */
-    private buildRelationSubQuery(relationName: string, callback?: (query: EloquentBuilder) => void): Knex.QueryBuilder {
+    private buildRelationSubQuery(relationName: string, callback?: (query: QueryBuilder) => void): Knex.QueryBuilder {
         const dummyModel = new this.modelClass();
         if (typeof (dummyModel as any)[relationName] !== "function") {
             throw new Error(`[StruxJS ORM Error]: Relationship '${relationName}' is not defined on model ${this.modelClass.name}.`);
@@ -631,13 +726,13 @@ export class EloquentBuilder<T extends BaseModel = any> {
         if (relation.relationType === "hasMany" || relation.relationType === "hasOne") {
             subQuery = knex(relatedTable).whereRaw(`${relatedTable}.${relation.foreignKey} = ${parentTable}.${relation.localKey}`);
             if (callback) {
-                const nestedBuilder = new EloquentBuilder(relation.related as any, subQuery, (relatedDummy as any).primaryKey, "sql");
+                const nestedBuilder = new QueryBuilder(relation.related as any, subQuery, (relatedDummy as any).primaryKey, "sql");
                 callback(nestedBuilder);
             }
         } else if (relation.relationType === "belongsTo") {
             subQuery = knex(relatedTable).whereRaw(`${relatedTable}.${relation.localKey} = ${parentTable}.${relation.foreignKey}`);
             if (callback) {
-                const nestedBuilder = new EloquentBuilder(relation.related as any, subQuery, (relatedDummy as any).primaryKey, "sql");
+                const nestedBuilder = new QueryBuilder(relation.related as any, subQuery, (relatedDummy as any).primaryKey, "sql");
                 callback(nestedBuilder);
             }
         } else if (relation.relationType === "belongsToMany") {
@@ -646,7 +741,7 @@ export class EloquentBuilder<T extends BaseModel = any> {
                 .join(relatedTable, `${relatedTable}.${b2m.relatedKey}`, "=", `${b2m.pivotTable!}.${b2m.relatedPivotKey!}`)
                 .whereRaw(`${b2m.pivotTable!}.${b2m.foreignKey} = ${parentTable}.${b2m.parentKey}`);
             if (callback) {
-                const nestedBuilder = new EloquentBuilder(relation.related as any, subQuery, (relatedDummy as any).primaryKey, "sql");
+                const nestedBuilder = new QueryBuilder(relation.related as any, subQuery, (relatedDummy as any).primaryKey, "sql");
                 callback(nestedBuilder);
             }
         } else {
@@ -695,9 +790,9 @@ export class EloquentBuilder<T extends BaseModel = any> {
     /**
      * Select column via subquery
      */
-    public selectSub(subQuery: EloquentBuilder | ((builder: Knex.QueryBuilder) => void), alias: string): this {
+    public selectSub(subQuery: QueryBuilder | ((builder: Knex.QueryBuilder) => void), alias: string): this {
         if (this.driver === "sql") {
-            if (subQuery instanceof EloquentBuilder) {
+            if (subQuery instanceof QueryBuilder) {
                 this.query.select(subQuery.getKnexQuery().as(alias));
             } else if (typeof subQuery === "function") {
                 this.query.select(function (this: Knex.QueryBuilder) {
@@ -721,17 +816,17 @@ export class EloquentBuilder<T extends BaseModel = any> {
     /**
      * Add where condition or nested closure group
      */
-    public where(column: string | Record<string, any> | ((builder: EloquentBuilder<T>) => void) | EloquentBuilder, operator?: any, value?: any): this {
+    public where(column: string | Record<string, any> | ((builder: QueryBuilder<T>) => void) | QueryBuilder, operator?: any, value?: any): this {
         if (typeof column === "function") {
             if (this.driver === "sql") {
                 // eslint-disable-next-line @typescript-eslint/no-this-alias
                 const builderInstance = this;
                 this.query.where(function (this: Knex.QueryBuilder) {
-                    const nestedBuilder = new EloquentBuilder(builderInstance.modelClass, this, builderInstance.primaryKey, "sql");
+                    const nestedBuilder = new QueryBuilder(builderInstance.modelClass, this, builderInstance.primaryKey, "sql");
                     (column as any)(nestedBuilder);
                 });
             }
-        } else if (column instanceof EloquentBuilder) {
+        } else if (column instanceof QueryBuilder) {
             if (this.driver === "sql") {
                 this.query.where(column.getKnexQuery());
             }
@@ -743,14 +838,14 @@ export class EloquentBuilder<T extends BaseModel = any> {
             }
         } else if (value !== undefined) {
             if (this.driver === "sql") {
-                const targetVal = value instanceof EloquentBuilder ? value.getKnexQuery() : value;
+                const targetVal = value instanceof QueryBuilder ? value.getKnexQuery() : value;
                 this.query.where(column as string, operator, targetVal);
             } else {
                 this.applyMongoWhere(column as string, operator, value);
             }
         } else if (operator !== undefined) {
             if (this.driver === "sql") {
-                const targetVal = operator instanceof EloquentBuilder ? operator.getKnexQuery() : operator;
+                const targetVal = operator instanceof QueryBuilder ? operator.getKnexQuery() : operator;
                 this.query.where(column as string, "=", targetVal);
             } else {
                 this.applyMongoWhere(column as string, "=", operator);
@@ -798,7 +893,7 @@ export class EloquentBuilder<T extends BaseModel = any> {
     /**
      * Add OR WHERE condition
      */
-    public orWhere(column: string | Record<string, any> | ((builder: EloquentBuilder<T>) => void) | EloquentBuilder, operator?: any, value?: any): this {
+    public orWhere(column: string | Record<string, any> | ((builder: QueryBuilder<T>) => void) | QueryBuilder, operator?: any, value?: any): this {
         return this.where(column as any, operator, value);
     }
 
@@ -829,10 +924,10 @@ export class EloquentBuilder<T extends BaseModel = any> {
     /**
      * WHERE IN condition
      */
-    public whereIn(column: string, values: any[] | EloquentBuilder | ((builder: Knex.QueryBuilder) => void)): this {
+    public whereIn(column: string, values: any[] | QueryBuilder | ((builder: Knex.QueryBuilder) => void)): this {
         const key = column === "id" ? "_id" : column;
         if (this.driver === "sql") {
-            if (values instanceof EloquentBuilder) {
+            if (values instanceof QueryBuilder) {
                 this.query.whereIn(column, values.getKnexQuery());
             } else if (typeof values === "function") {
                 this.query.whereIn(column, values as any);
@@ -849,10 +944,10 @@ export class EloquentBuilder<T extends BaseModel = any> {
     /**
      * WHERE NOT IN condition
      */
-    public whereNotIn(column: string, values: any[] | EloquentBuilder | ((builder: Knex.QueryBuilder) => void)): this {
+    public whereNotIn(column: string, values: any[] | QueryBuilder | ((builder: Knex.QueryBuilder) => void)): this {
         const key = column === "id" ? "_id" : column;
         if (this.driver === "sql") {
-            if (values instanceof EloquentBuilder) {
+            if (values instanceof QueryBuilder) {
                 this.query.whereNotIn(column, values.getKnexQuery());
             } else if (typeof values === "function") {
                 this.query.whereNotIn(column, values as any);
@@ -869,9 +964,9 @@ export class EloquentBuilder<T extends BaseModel = any> {
     /**
      * WHERE EXISTS subquery condition
      */
-    public whereExists(callback: EloquentBuilder | ((builder: Knex.QueryBuilder) => void)): this {
+    public whereExists(callback: QueryBuilder | ((builder: Knex.QueryBuilder) => void)): this {
         if (this.driver === "sql") {
-            if (callback instanceof EloquentBuilder) {
+            if (callback instanceof QueryBuilder) {
                 this.query.whereExists(callback.getKnexQuery());
             } else {
                 this.query.whereExists(callback);
@@ -883,9 +978,9 @@ export class EloquentBuilder<T extends BaseModel = any> {
     /**
      * WHERE NOT EXISTS subquery condition
      */
-    public whereNotExists(callback: EloquentBuilder | ((builder: Knex.QueryBuilder) => void)): this {
+    public whereNotExists(callback: QueryBuilder | ((builder: Knex.QueryBuilder) => void)): this {
         if (this.driver === "sql") {
-            if (callback instanceof EloquentBuilder) {
+            if (callback instanceof QueryBuilder) {
                 this.query.whereNotExists(callback.getKnexQuery());
             } else {
                 this.query.whereNotExists(callback);
@@ -976,9 +1071,9 @@ export class EloquentBuilder<T extends BaseModel = any> {
     /**
      * FROM SUBQUERY
      */
-    public fromSub(subQuery: EloquentBuilder | ((builder: Knex.QueryBuilder) => void), alias: string): this {
+    public fromSub(subQuery: QueryBuilder | ((builder: Knex.QueryBuilder) => void), alias: string): this {
         if (this.driver === "sql") {
-            if (subQuery instanceof EloquentBuilder) {
+            if (subQuery instanceof QueryBuilder) {
                 this.query.from(subQuery.getKnexQuery().as(alias));
             } else if (typeof subQuery === "function") {
                 this.query.from(subQuery as any).as(alias);
@@ -1352,7 +1447,7 @@ export class EloquentBuilder<T extends BaseModel = any> {
     }
 
     /**
-     * Paginate query results Eloquent-style with Collection data
+     * Paginate query results Strux-style with Collection data
      */
     public async paginate(perPage = 15, page = 1): Promise<PaginationResult<T>> {
         const pageNum = Math.max(1, page);
@@ -1379,6 +1474,120 @@ export class EloquentBuilder<T extends BaseModel = any> {
         await this.eagerLoadRelations(models);
 
         return new PaginationResult(collect(models), total, limitNum, pageNum);
+    }
+
+    /**
+     * Chunk the results of the query.
+     */
+    public async chunk(count: number, callback: (models: Collection<T>, page: number) => boolean | void | Promise<boolean | void>): Promise<void> {
+        let page = 1;
+        let hasMore = true;
+
+        while (hasMore) {
+            const offsetNum = (page - 1) * count;
+            const dataQuery = this.query.clone().limit(count).offset(offsetNum);
+            const rows = await dataQuery;
+            const modelsArray = Array.isArray(rows) ? rows.map((row: any) => new this.modelClass(row)) : [];
+            await this.eagerLoadRelations(modelsArray);
+            
+            const models = collect(modelsArray);
+
+            if (models.isEmpty()) {
+                hasMore = false;
+                break;
+            }
+
+            const cbResult = await callback(models, page);
+            
+            if (cbResult === false) {
+                break;
+            }
+
+            if (models.count() < count) {
+                hasMore = false;
+            } else {
+                page++;
+            }
+        }
+    }
+
+    /**
+     * Query lazily, by chunks of the given size.
+     */
+    public async *lazy(chunkSize: number = 1000): AsyncGenerator<T, void, unknown> {
+        let page = 1;
+        let hasMore = true;
+
+        while (hasMore) {
+            const offsetNum = (page - 1) * chunkSize;
+            const dataQuery = this.query.clone().limit(chunkSize).offset(offsetNum);
+            const rows = await dataQuery;
+            const modelsArray = Array.isArray(rows) ? rows.map((row: any) => new this.modelClass(row)) : [];
+            await this.eagerLoadRelations(modelsArray);
+            
+            const models = collect(modelsArray);
+
+            if (models.isEmpty()) {
+                hasMore = false;
+                break;
+            }
+
+            for (const model of models) {
+                yield model;
+            }
+
+            if (models.count() < chunkSize) {
+                hasMore = false;
+            } else {
+                page++;
+            }
+        }
+    }
+
+    /**
+     * Paginate query results using a cursor.
+     */
+    public async cursorPaginate(perPage = 15, cursorColumn = 'id', direction: 'asc' | 'desc' = 'asc', currentCursor: string | null = null): Promise<CursorPaginationResult<T>> {
+        const limitNum = Math.max(1, perPage);
+        const knexQuery = this.query.clone();
+
+        knexQuery.orderBy(cursorColumn, direction);
+
+        let cursorValue: any = null;
+        if (currentCursor) {
+            try {
+                const decoded = Buffer.from(currentCursor, 'base64').toString('utf8');
+                const parsed = JSON.parse(decoded);
+                cursorValue = parsed.value;
+            } catch (e) {
+                // Ignore invalid cursor
+            }
+        }
+
+        if (cursorValue !== null) {
+            const operator = direction.toLowerCase() === 'asc' ? '>' : '<';
+            knexQuery.where(cursorColumn, operator, cursorValue);
+        }
+
+        const rows = await knexQuery.limit(limitNum + 1);
+        const modelsArray = Array.isArray(rows) ? rows.map((row: any) => new this.modelClass(row)) : [];
+        await this.eagerLoadRelations(modelsArray);
+
+        const hasNext = modelsArray.length > limitNum;
+        if (hasNext) {
+            modelsArray.pop();
+        }
+
+        let nextCursor: string | null = null;
+        if (hasNext && modelsArray.length > 0) {
+            const lastItem = modelsArray[modelsArray.length - 1];
+            const lastVal = (lastItem as any)[cursorColumn];
+            if (lastVal !== undefined) {
+                nextCursor = Buffer.from(JSON.stringify({ value: lastVal })).toString('base64');
+            }
+        }
+
+        return new CursorPaginationResult<T>(collect(modelsArray), limitNum, nextCursor, null);
     }
 
     /**

@@ -17,7 +17,7 @@ StruxJS is a modern, TypeScript-first web framework that combines the blazing-fa
 
 * **Blazing Fast HTTP:** Powered by Fastify under the hood for maximum throughput.
 * **IoC Container:** A powerful Dependency Injection container that manages class dependencies automatically.
-* **Active Record ORM:** An expressive `BaseModel` ORM inspired by Eloquent, supporting relationships, scopes, and aggregations.
+* **Active Record ORM:** An expressive `BaseModel` ORM inspired by Strux ORM, supporting relationships, scopes, and aggregations.
 * **Concurrency Engine:** Built-in Multi-Core Cluster Engine and `ThreadPool` for heavy CPU-bound tasks without blocking the event loop.
 * **Authentication & Security:** Native support for CSRF protection, Rate Limiting (Throttle), Session Management, and JWT API Authentication.
 * **Background Jobs:** A robust Redis-backed Queue system with asynchronous workers.

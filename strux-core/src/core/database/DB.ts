@@ -1,7 +1,7 @@
 import { Knex } from "knex";
 import { BaseModel } from "./BaseModel.js";
 import { MongoConnection } from "./MongoConnection.js";
-import { collect, Collection } from "./EloquentBuilder.js";
+import { collect, Collection } from "./QueryBuilder.js";
 
 export class DB {
     /**
