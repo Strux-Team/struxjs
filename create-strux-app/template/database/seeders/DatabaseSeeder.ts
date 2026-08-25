@@ -1,5 +1,5 @@
 import { Seeder } from "struxjs";
-import UserSeeder from "./UserSeeder.ts";
+import UserSeeder from "./UserSeeder.js";
 
 export default class DatabaseSeeder extends Seeder {
     public async run(): Promise<void> {

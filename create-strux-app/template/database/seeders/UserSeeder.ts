@@ -1,5 +1,5 @@
 import { Auth, Seeder } from "struxjs";
-import { User } from "../../app/Models/User.ts";
+import { User } from "../../app/Models/User.js";
 
 export default class UserSeeder extends Seeder {
     public async run(): Promise<void> {

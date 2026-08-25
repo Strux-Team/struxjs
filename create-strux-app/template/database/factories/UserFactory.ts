@@ -1,5 +1,5 @@
 import { Factory } from "struxjs";
-import { User } from "../../app/Models/User.ts";
+import { User } from "../../app/Models/User.js";
 
 export class UserFactory extends Factory<User> {
     protected model = User;
