@@ -1081,16 +1081,17 @@ export abstract class BaseModel {
     /**
      * Update model attributes and save to database
      */
-    public async update(attributes: Record<string, any>): Promise<boolean> {
+    public async update(attributes: Record<string, any>): Promise<this> {
         this.fill(attributes);
-        return await this.save();
+        await this.save();
+        return this;
     }
 
     /**
      * Delete model instance from database.
      * If softDelete = true, sets deleted_at instead of removing the row.
      */
-    public async delete(): Promise<boolean> {
+    public async delete(): Promise<this | false> {
         const id = this.attributes.id || this.attributes._id;
         if (!id) return false;
 
@@ -1116,7 +1117,7 @@ export abstract class BaseModel {
 
             await this.onDeleted();
             await this.dispatchModelBroadcast("deleted");
-            return true;
+            return this;
         }
 
         // HARD DELETE path
@@ -1125,13 +1126,13 @@ export abstract class BaseModel {
             await db.collection(tableName).deleteOne({ _id: MongoConnection.toObjectId(id) });
             await this.onDeleted();
             await this.dispatchModelBroadcast("deleted");
-            return true;
+            return this;
         }
 
         await BaseModel.connection()(tableName).where(this.primaryKey, id).delete();
         await this.onDeleted();
         await this.dispatchModelBroadcast("deleted");
-        return true;
+        return this;
     }
 
     /**
@@ -1140,7 +1141,7 @@ export abstract class BaseModel {
      *
      * await post.restore();
      */
-    public async restore(): Promise<boolean> {
+    public async restore(): Promise<this | false> {
         if (!this.softDelete) return false;
 
         const id = this.attributes.id || this.attributes._id;
@@ -1157,11 +1158,11 @@ export abstract class BaseModel {
                 { _id: MongoConnection.toObjectId(id) },
                 { $set: { [col]: null } }
             );
-            return true;
+            return this;
         }
 
         await BaseModel.connection()(tableName).where(this.primaryKey, id).update({ [col]: null });
-        return true;
+        return this;
     }
 
     /**
@@ -1169,7 +1170,7 @@ export abstract class BaseModel {
      *
      * await post.forceDelete();
      */
-    public async forceDelete(): Promise<boolean> {
+    public async forceDelete(): Promise<this | false> {
         const id = this.attributes.id || this.attributes._id;
         if (!id) return false;
 
@@ -1181,12 +1182,12 @@ export abstract class BaseModel {
             const db = MongoConnection.getDb();
             await db.collection(tableName).deleteOne({ _id: MongoConnection.toObjectId(id) });
             await this.onDeleted();
-            return true;
+            return this;
         }
 
         await BaseModel.connection()(tableName).where(this.primaryKey, id).delete();
         await this.onDeleted();
-        return true;
+        return this;
     }
 
     /**

@@ -1595,9 +1595,17 @@ export class QueryBuilder<T extends BaseModel = any> {
      */
     public async update(values: Record<string, any>): Promise<number> {
         this.applyGlobalScopes();
+        
+        const dummy = new this.modelClass();
+        if ((dummy as any).timestamps !== false) {
+            const updatedCol = (dummy as any).updatedColumn === null ? null : ((dummy as any).updatedColumn ?? (this.modelClass as any).UPDATED_AT);
+            if (updatedCol && !values[updatedCol]) {
+                values[updatedCol] = new Date();
+            }
+        }
+
         if (this.driver === "mongodb") {
             const db = MongoConnection.getDb();
-            const dummy = new this.modelClass();
             const tableName = (dummy as any).table || `${dummy.constructor.name.toLowerCase()}s`;
             const res = await db.collection(tableName).updateMany(this.mongoFilter, { $set: values });
             return res.modifiedCount;

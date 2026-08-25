@@ -835,7 +835,16 @@ export async function validatePayload(
                     }
                 }
 
-                if ((value !== undefined && value !== null && value !== "") || (currentUploadedFile && currentUploadedFile.isValid())) {
+                if (ruleName === "nullable" || ruleName === "optional") {
+                    continue;
+                }
+
+                let skipValidation = false;
+                if (value === undefined) skipValidation = true;
+                else if (value === null && fieldRules.includes("nullable")) skipValidation = true;
+                else if (value === "" && !fieldRules.includes("required")) skipValidation = true;
+
+                if (!skipValidation || (currentUploadedFile && currentUploadedFile.isValid())) {
 
                     // 2. Rule: email
                     if (ruleName === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
@@ -943,6 +952,42 @@ export async function validatePayload(
                             if (!errors[field]) errors[field] = [];
                             errors[field].push(getErrorMessage(ruleName, `The selected :attribute is invalid.`));
                         }
+                    }
+
+                    // 14. Rule: string
+                    if (ruleName === "string" && typeof value !== "string") {
+                        if (!errors[field]) errors[field] = [];
+                        errors[field].push(getErrorMessage(ruleName, `The :attribute must be a string.`));
+                    }
+
+                    // 15. Rule: boolean
+                    if (ruleName === "boolean") {
+                        const isBoolean = [true, false, 1, 0, "1", "0", "true", "false"].includes(value);
+                        if (!isBoolean) {
+                            if (!errors[field]) errors[field] = [];
+                            errors[field].push(getErrorMessage(ruleName, `The :attribute field must be true or false.`));
+                        }
+                    }
+
+                    // 16. Rule: integer
+                    if (ruleName === "integer") {
+                        const isInteger = typeof value === "number" ? Number.isInteger(value) : /^-?\d+$/.test(String(value));
+                        if (!isInteger) {
+                            if (!errors[field]) errors[field] = [];
+                            errors[field].push(getErrorMessage(ruleName, `The :attribute must be an integer.`));
+                        }
+                    }
+
+                    // 17. Rule: array
+                    if (ruleName === "array" && !Array.isArray(value)) {
+                        if (!errors[field]) errors[field] = [];
+                        errors[field].push(getErrorMessage(ruleName, `The :attribute must be an array.`));
+                    }
+
+                    // 18. Rule: date
+                    if (ruleName === "date" && isNaN(Date.parse(String(value)))) {
+                        if (!errors[field]) errors[field] = [];
+                        errors[field].push(getErrorMessage(ruleName, `The :attribute is not a valid date.`));
                     }
                 }
             }

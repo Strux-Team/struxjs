@@ -321,6 +321,20 @@ The field under validation must be present in the request payload and not empty 
 { name: "required" }
 ```
 
+### `optional`
+The field under validation is not required. If it is missing from the payload (`undefined`), it will gracefully skip other validation rules for that field.
+
+```typescript
+{ middle_name: "optional|string" }
+```
+
+### `nullable`
+The field under validation may be `null`. If `null` is provided, it will skip other validation rules rather than failing them.
+
+```typescript
+{ biography: "nullable|string" }
+```
+
 ### `email`
 The field under validation must be formatted as a valid email address.
 
@@ -376,6 +390,41 @@ The field under validation must be a valid number or numeric string.
 
 ```typescript
 { price: "numeric" }
+```
+
+### `string`
+The field under validation must be a string type.
+
+```typescript
+{ title: "string" }
+```
+
+### `boolean`
+The field under validation must be able to be cast as a boolean. Accepted input are `true`, `false`, `1`, `0`, `"1"`, and `"0"`.
+
+```typescript
+{ accept_terms: "boolean" }
+```
+
+### `integer`
+The field under validation must be an integer.
+
+```typescript
+{ quantity: "integer" }
+```
+
+### `array`
+The field under validation must be an array.
+
+```typescript
+{ tags: "array" }
+```
+
+### `date`
+The field under validation must be a valid date according to the JavaScript `Date.parse()` method.
+
+```typescript
+{ start_date: "date" }
 ```
 
 ### `alpha`

@@ -119,4 +119,89 @@ describe("Validation Engine", () => {
         expect(req.params.id).toBe("42");
         expect(req.routeParam("id")).toBe("42");
     });
+
+    test("validates data types correctly (string, boolean, integer, array, date)", async () => {
+        const payload = {
+            str: "hello",
+            boolTrue: true,
+            boolFalse: "0",
+            num: 42,
+            arr: [1, 2, 3],
+            dt: "2026-08-25"
+        };
+
+        const validated = await validatePayload(payload, {
+            str: "string",
+            boolTrue: "boolean",
+            boolFalse: "boolean",
+            num: "integer",
+            arr: "array",
+            dt: "date"
+        });
+
+        expect(validated.str).toBe("hello");
+
+        const invalidPayload = {
+            str: 123,
+            bool: "yes",
+            num: 3.14,
+            arr: "not array",
+            dt: "not a date"
+        };
+
+        try {
+            await validatePayload(invalidPayload, {
+                str: "string",
+                bool: "boolean",
+                num: "integer",
+                arr: "array",
+                dt: "date"
+            });
+            expect.fail("Should have thrown ValidationError");
+        } catch (err: any) {
+            expect(err).toBeInstanceOf(ValidationError);
+            const errors = (err as ValidationError).errors;
+
+            expect(errors.str).toContain("The str must be a string.");
+            expect(errors.bool).toContain("The bool field must be true or false.");
+            expect(errors.num).toContain("The num must be an integer.");
+            expect(errors.arr).toContain("The arr must be an array.");
+            expect(errors.dt).toContain("The dt is not a valid date.");
+        }
+    });
+
+    test("validates nullable and optional correctly", async () => {
+        const payload = {
+            name: "John",
+            bio: null, // nullable -> pass
+            // age missing -> optional -> pass
+        };
+
+        const validated = await validatePayload(payload, {
+            name: "required|string",
+            bio: "nullable|string",
+            age: "optional|integer"
+        });
+
+        expect(validated.name).toBe("John");
+        expect(validated.bio).toBe(null);
+
+        const invalidPayload = {
+            name: "John",
+            bio: null, // missing nullable, should fail string rule
+        };
+
+        try {
+            await validatePayload(invalidPayload, {
+                name: "required|string",
+                bio: "string", // null fails because not nullable
+            });
+            expect.fail("Should have thrown ValidationError");
+        } catch (err: any) {
+            expect(err).toBeInstanceOf(ValidationError);
+            const errors = (err as ValidationError).errors;
+            expect(errors.bio).toContain("The bio must be a string.");
+        }
+    });
 });
+
