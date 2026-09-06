@@ -34,6 +34,14 @@ export class ApiAuthMiddleware implements Middleware {
             return;
         }
 
+        // Reject refresh token from accessing API endpoints
+        if (payload.type === "refresh") {
+            reply.status(401).send({
+                message: "Unauthenticated. Cannot use refresh token to access protected endpoints."
+            });
+            return;
+        }
+
         // Guard mismatch — e.g. using an 'admin' token on an 'api' route
         if (payload.guard !== guard) {
             reply.status(403).send({

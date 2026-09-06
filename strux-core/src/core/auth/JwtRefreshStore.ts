@@ -2,6 +2,7 @@ import Redis from "ioredis";
 import type { Redis as RedisClient } from "ioredis";
 import { createHash, randomBytes } from "crypto";
 import { config, env } from "../config/Config.js";
+import { parseTtlToSeconds } from "./ttl.js";
 
 /**
  * JwtRefreshStore — persists issued refresh tokens in Redis.
@@ -56,7 +57,8 @@ export class JwtRefreshStore {
 
     public useRedis(options?: RefreshStoreRedisOptions): void {
         this.driver = "redis";
-        this.keyPrefix = options?.prefix || config("redis.jwt_refresh.prefix") || env("REDIS_JWT_REFRESH_PREFIX", "strux_rt:");
+        const globalPrefix = config("redis.default.prefix") ?? env("REDIS_PREFIX", "");
+        this.keyPrefix = options?.prefix || config("redis.jwt_refresh.prefix") || env("REDIS_JWT_REFRESH_PREFIX", `${globalPrefix}rt:`);
 
         const host     = options?.host     || config("redis.default.host")     || env("REDIS_HOST", "127.0.0.1");
         const port     = Number(options?.port  || config("redis.default.port") || env("REDIS_PORT", 6379));
@@ -68,7 +70,8 @@ export class JwtRefreshStore {
 
     public useRedisClient(client: RedisClient, prefix?: string): void {
         this.driver      = "redis";
-        this.keyPrefix   = prefix || config("redis.jwt_refresh.prefix") || env("REDIS_JWT_REFRESH_PREFIX", "strux_rt:");
+        const globalPrefix = config("redis.default.prefix") ?? env("REDIS_PREFIX", "");
+        this.keyPrefix   = prefix || config("redis.jwt_refresh.prefix") || env("REDIS_JWT_REFRESH_PREFIX", `${globalPrefix}rt:`);
         this.redisClient = client;
     }
 
@@ -110,14 +113,15 @@ export class JwtRefreshStore {
      * @param jti         — unique token identifier (embedded in JWT claims)
      * @param userId      — owner's primary key
      * @param guard       — guard name
-     * @param ttlSeconds  — token lifetime in seconds
+     * @param ttlSeconds  — token lifetime in seconds (or duration string like "30d", "7d")
      */
-    public async store(jti: string, userId: any, guard: string, ttlSeconds: number): Promise<void> {
+    public async store(jti: string, userId: any, guard: string, ttlSeconds: number | string): Promise<void> {
+        const ttl = parseTtlToSeconds(ttlSeconds, 604800);
         const record: RefreshTokenRecord = {
             jti,
             userId,
             guard,
-            expiresAt: Math.floor(Date.now() / 1000) + ttlSeconds,
+            expiresAt: Math.floor(Date.now() / 1000) + ttl,
             createdAt: Math.floor(Date.now() / 1000)
         };
 
@@ -130,12 +134,12 @@ export class JwtRefreshStore {
                     this.tokenKey(jti),
                     JSON.stringify(record),
                     "EX",
-                    ttlSeconds
+                    ttl
                 );
 
                 // Add JTI to the user's active set (set TTL slightly longer than token)
                 await redis.sadd(this.userKey(userId), jti);
-                await redis.expire(this.userKey(userId), ttlSeconds + 60);
+                await redis.expire(this.userKey(userId), ttl + 60);
             } catch (err: any) {
                 console.error("[StruxJS JWT RefreshStore]: Redis store failed, using memory fallback.", err.message);
                 this.memoryTokens.set(jti, record);
@@ -156,19 +160,22 @@ export class JwtRefreshStore {
             try {
                 const redis = await this.getRedis();
                 const raw = await redis.get(this.tokenKey(jti));
-                if (!raw) return null;
-                return JSON.parse(raw) as RefreshTokenRecord;
+                if (raw) {
+                    return JSON.parse(raw) as RefreshTokenRecord;
+                }
             } catch (err: any) {
-                console.error("[StruxJS JWT RefreshStore]: Redis find failed, checking memory.", err.message);
+                console.error("[StruxJS JWT RefreshStore]: Redis find failed, checking memory fallback.", err.message);
             }
         }
 
+        // Memory fallback: check in-memory store if not in Redis or Redis failed
         const record = this.memoryTokens.get(jti);
         if (!record) return null;
 
         // Memory: manual TTL check
         if (record.expiresAt < Math.floor(Date.now() / 1000)) {
             this.memoryTokens.delete(jti);
+            this.memoryUserIndex.get(String(record.userId))?.delete(jti);
             return null;
         }
 
@@ -188,7 +195,6 @@ export class JwtRefreshStore {
                     await redis.del(this.tokenKey(jti));
                     await redis.srem(this.userKey(record.userId), jti);
                 }
-                return;
             } catch (err: any) {
                 console.error("[StruxJS JWT RefreshStore]: Redis revoke failed, removing from memory.", err.message);
             }
@@ -213,7 +219,7 @@ export class JwtRefreshStore {
                 const redis = await this.getRedis();
                 const jtis = await redis.smembers(this.userKey(userId));
 
-                if (jtis.length > 0) {
+                if (jtis && jtis.length > 0) {
                     const pipeline = redis.pipeline();
                     for (const jti of jtis) {
                         pipeline.del(this.tokenKey(jti));
@@ -221,7 +227,6 @@ export class JwtRefreshStore {
                     pipeline.del(this.userKey(userId));
                     await pipeline.exec();
                 }
-                return;
             } catch (err: any) {
                 console.error("[StruxJS JWT RefreshStore]: Redis revokeAll failed, flushing memory.", err.message);
             }
@@ -242,7 +247,7 @@ export class JwtRefreshStore {
      * const sessions = await Auth.jwt().getActiveSessions(userId);
      */
     public async listByUser(userId: any): Promise<RefreshTokenRecord[]> {
-        const records: RefreshTokenRecord[] = [];
+        const recordsMap = new Map<string, RefreshTokenRecord>();
         const now = Math.floor(Date.now() / 1000);
 
         if (this.driver === "redis") {
@@ -250,15 +255,15 @@ export class JwtRefreshStore {
                 const redis = await this.getRedis();
                 const jtis = await redis.smembers(this.userKey(userId));
 
-                for (const jti of jtis) {
-                    const raw = await redis.get(this.tokenKey(jti));
-                    if (raw) {
-                        const record: RefreshTokenRecord = JSON.parse(raw);
-                        if (record.expiresAt > now) records.push(record);
+                if (jtis) {
+                    for (const jti of jtis) {
+                        const raw = await redis.get(this.tokenKey(jti));
+                        if (raw) {
+                            const record: RefreshTokenRecord = JSON.parse(raw);
+                            if (record.expiresAt > now) recordsMap.set(record.jti, record);
+                        }
                     }
                 }
-
-                return records;
             } catch (err: any) {
                 console.error("[StruxJS JWT RefreshStore]: Redis listByUser failed, reading from memory.", err.message);
             }
@@ -269,12 +274,12 @@ export class JwtRefreshStore {
             for (const jti of jtis) {
                 const record = this.memoryTokens.get(jti);
                 if (record && record.expiresAt > now) {
-                    records.push(record);
+                    recordsMap.set(record.jti, record);
                 }
             }
         }
 
-        return records;
+        return Array.from(recordsMap.values());
     }
 
     /* ---------------------------------------------------------------------- */

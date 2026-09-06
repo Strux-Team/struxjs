@@ -4,12 +4,13 @@ import { BaseModel } from "../database/BaseModel.js";
 import { jwtBlacklist, BlacklistDriver, BlacklistRedisOptions } from "./JwtBlacklist.js";
 import { jwtRefreshStore, RefreshTokenRecord, RefreshStoreRedisOptions } from "./JwtRefreshStore.js";
 import { env, config } from "../config/Config.js";
+import { parseTtlToSeconds } from "./ttl.js";
 
 export interface JwtPayload {
     sub: any;         // user primary key
     guard: string;    // guard name (e.g. "api")
     jti?: string;     // unique token ID — set on refresh tokens for store lookup
-    type?: string;    // "refresh" for refresh tokens
+    type?: string;    // "access" | "refresh"
     iat?: number;
     exp?: number;
     [key: string]: any;
@@ -17,8 +18,8 @@ export interface JwtPayload {
 
 export interface JwtConfig {
     secret: string;
-    ttl: number;                             // access token TTL in seconds (default: 3600)
-    refreshTtl: number;                      // refresh token TTL in seconds (default: 604800)
+    ttl: number | string;                    // access token TTL in seconds or duration string (default: 3600)
+    refreshTtl: number | string;             // refresh token TTL in seconds or duration string (default: 604800)
     algorithm?: jwt.Algorithm;
 
     // Blacklist (for access token invalidation)
@@ -39,8 +40,8 @@ let guardRegistry: Map<string, new (attrs?: Record<string, any>) => BaseModel>;
 // Active config
 let jwtConfig: JwtConfig = {
     secret:     env("JWT_SECRET", config("app.key", "struxjs_jwt_secret_change_me")),
-    ttl:        Number(env("JWT_TTL", 3600)),
-    refreshTtl: Number(env("JWT_REFRESH_TTL", 604800)),
+    ttl:        parseTtlToSeconds(env("JWT_TTL", env("JWT_EXPIRES_IN", 3600)), 3600),
+    refreshTtl: parseTtlToSeconds(env("JWT_REFRESH_TTL", env("JWT_REFRESH_EXPIRES_IN", 604800)), 604800),
     algorithm:  "HS256",
     blacklist:  (env("JWT_BLACKLIST_DRIVER", "memory") as BlacklistDriver),
     refreshStore: (env("JWT_REFRESH_STORE", "memory") as BlacklistDriver),
@@ -75,7 +76,12 @@ export class JwtGuard {
      * });
      */
     public static configure(config: Partial<JwtConfig>): void {
-        jwtConfig = { ...jwtConfig, ...config };
+        jwtConfig = {
+            ...jwtConfig,
+            ...config,
+            ttl: parseTtlToSeconds(config.ttl ?? jwtConfig.ttl, 3600),
+            refreshTtl: parseTtlToSeconds(config.refreshTtl ?? jwtConfig.refreshTtl, 604800),
+        };
 
         // (Re-)initialize access token blacklist
         if (jwtConfig.blacklist === "redis") {
@@ -109,15 +115,20 @@ export class JwtGuard {
         const id = (user as any).attributes?.id ?? (user as any).id;
         if (!id) throw new Error("[StruxJS JWT Error]: Cannot issue token for a model without a primary key.");
 
+        const ttl = parseTtlToSeconds(jwtConfig.ttl, 3600);
+        const jti = extraClaims.jti || jwtRefreshStore.generateJti();
+        const { jti: _claimJti, ...restClaims } = extraClaims;
+
         return jwt.sign(
-            { sub: id, guard, ...extraClaims },
+            { sub: id, guard, type: "access", jti, ...restClaims },
             jwtConfig.secret,
-            { expiresIn: jwtConfig.ttl, algorithm: jwtConfig.algorithm || "HS256" }
+            { expiresIn: ttl, algorithm: jwtConfig.algorithm || "HS256" }
         );
     }
 
     /**
      * Issue an access + refresh token pair and persist the refresh token.
+     * Both access token and refresh token share the same JTI.
      *
      * const { token, refreshToken, expiresIn } = await JwtGuard.issueTokenPair(user);
      */
@@ -129,21 +140,24 @@ export class JwtGuard {
         const id = (user as any).attributes?.id ?? (user as any).id;
         if (!id) throw new Error("[StruxJS JWT Error]: Cannot issue token for a model without a primary key.");
 
-        const token = this.issueToken(user, guard, extraClaims);
+        const ttl = parseTtlToSeconds(jwtConfig.ttl, 3600);
+        const refreshTtl = parseTtlToSeconds(jwtConfig.refreshTtl, 604800);
 
-        // Generate a unique JTI for the refresh token
+        // Generate a shared JTI for both access token and refresh token
         const jti = jwtRefreshStore.generateJti();
+
+        const token = this.issueToken(user, guard, { ...extraClaims, jti });
 
         const refreshToken = jwt.sign(
             { sub: id, guard, type: "refresh", jti },
             jwtConfig.secret,
-            { expiresIn: jwtConfig.refreshTtl, algorithm: jwtConfig.algorithm || "HS256" }
+            { expiresIn: refreshTtl, algorithm: jwtConfig.algorithm || "HS256" }
         );
 
         // Persist refresh token in the store
-        await jwtRefreshStore.store(jti, id, guard, jwtConfig.refreshTtl);
+        await jwtRefreshStore.store(jti, id, guard, refreshTtl);
 
-        return { token, refreshToken, expiresIn: jwtConfig.ttl };
+        return { token, refreshToken, expiresIn: ttl };
     }
 
     /**
@@ -189,33 +203,38 @@ export class JwtGuard {
         const user = await (ModelClass as any).find(record.userId);
         if (!user) throw new Error("[StruxJS JWT Error]: User not found for refresh token subject.");
 
-        // 5. Issue new access token
-        const newAccessToken = this.issueToken(user, guard);
+        const ttl = parseTtlToSeconds(jwtConfig.ttl, 3600);
+        const refreshTtl = parseTtlToSeconds(jwtConfig.refreshTtl, 604800);
 
-        // 6. Handle rotation
+        // 5. Handle rotation
         if (jwtConfig.rotation) {
-            // Revoke old refresh token
+            // Revoke old refresh token from store
             await jwtRefreshStore.revoke(payload.jti);
 
-            // Issue new refresh token
+            // Blacklist old shared JTI -> automatically invalidates old access token!
+            const remaining = payload.exp ? payload.exp - Math.floor(Date.now() / 1000) : refreshTtl;
+            await jwtBlacklist.add(payload.jti, Math.max(1, Math.floor(remaining)));
+
+            // Generate new shared JTI for the new pair
             const newJti = jwtRefreshStore.generateJti();
+
+            // Issue new access token with new shared JTI
+            const newAccessToken = this.issueToken(user, guard, { jti: newJti });
+
+            // Issue new refresh token with new shared JTI
             const newRefreshToken = jwt.sign(
                 { sub: record.userId, guard, type: "refresh", jti: newJti },
                 jwtConfig.secret,
-                { expiresIn: jwtConfig.refreshTtl, algorithm: jwtConfig.algorithm || "HS256" }
+                { expiresIn: refreshTtl, algorithm: jwtConfig.algorithm || "HS256" }
             );
-            await jwtRefreshStore.store(newJti, record.userId, guard, jwtConfig.refreshTtl);
+            await jwtRefreshStore.store(newJti, record.userId, guard, refreshTtl);
 
-            // Also blacklist old refresh token string so it can't be reused even if someone
-            // obtained it before rotation happened (replay attack protection)
-            const remaining = payload.exp ? payload.exp - Math.floor(Date.now() / 1000) : jwtConfig.refreshTtl;
-            await jwtBlacklist.add(refreshTokenStr, Math.max(1, remaining));
-
-            return { token: newAccessToken, refreshToken: newRefreshToken, expiresIn: jwtConfig.ttl };
+            return { token: newAccessToken, refreshToken: newRefreshToken, expiresIn: ttl };
         }
 
-        // No rotation — return the same refresh token
-        return { token: newAccessToken, refreshToken: refreshTokenStr, expiresIn: jwtConfig.ttl };
+        // No rotation — return new access token with matching JTI and reuse refresh token
+        const newAccessToken = this.issueToken(user, guard, { jti: payload.jti });
+        return { token: newAccessToken, refreshToken: refreshTokenStr, expiresIn: ttl };
     }
 
     /* ---------------------------------------------------------------------- */
@@ -224,17 +243,15 @@ export class JwtGuard {
 
     /**
      * Verify and decode a JWT. Throws on invalid, expired, or blacklisted token.
+     * First checks signature & expiry in-memory, then checks blacklist via JTI.
      *
      * const payload = await JwtGuard.verifyToken(tokenString);
      */
     public static async verifyToken(token: string): Promise<JwtPayload> {
-        const isBlacklisted = await jwtBlacklist.has(token);
-        if (isBlacklisted) {
-            throw new Error("[StruxJS JWT Error]: Token has been invalidated.");
-        }
-
+        // 1. In-memory signature and expiration check first (Stateless / CPU)
+        let payload: JwtPayload;
         try {
-            return jwt.verify(token, jwtConfig.secret, {
+            payload = jwt.verify(token, jwtConfig.secret, {
                 algorithms: [jwtConfig.algorithm || "HS256"]
             }) as JwtPayload;
         } catch (err: any) {
@@ -242,6 +259,29 @@ export class JwtGuard {
             if (err.name === "JsonWebTokenError")  throw new Error("[StruxJS JWT Error]: Invalid token signature.");
             throw new Error(`[StruxJS JWT Error]: ${err.message}`);
         }
+
+        // 2. Stateful check: Blacklist via JTI or token identifier (only if token is valid & unexpired)
+        const identifier = payload.jti || token;
+        const isBlacklisted = await jwtBlacklist.has(identifier);
+        if (isBlacklisted) {
+            throw new Error("[StruxJS JWT Error]: Token has been invalidated.");
+        }
+
+        return payload;
+    }
+
+    /**
+     * Verify that a token is a valid access token.
+     * Throws if the token is invalid, expired, blacklisted, or is a refresh token.
+     *
+     * const payload = await JwtGuard.verifyAccessToken(tokenString);
+     */
+    public static async verifyAccessToken(token: string): Promise<JwtPayload> {
+        const payload = await this.verifyToken(token);
+        if (payload.type === "refresh") {
+            throw new Error("[StruxJS JWT Error]: Cannot use a refresh token as an access token.");
+        }
+        return payload;
     }
 
     /**
@@ -252,6 +292,19 @@ export class JwtGuard {
     public static async tryVerify(token: string): Promise<JwtPayload | null> {
         try {
             return await this.verifyToken(token);
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * Silently verify access token — returns payload or null if invalid or is a refresh token.
+     *
+     * const payload = await JwtGuard.tryVerifyAccessToken(token);
+     */
+    public static async tryVerifyAccessToken(token: string): Promise<JwtPayload | null> {
+        try {
+            return await this.verifyAccessToken(token);
         } catch {
             return null;
         }
@@ -321,6 +374,10 @@ export class JwtGuard {
 
         const payload = await this.tryVerify(token);
         if (!payload) return null;
+
+        // Refresh tokens cannot be used to authenticate requests or access protected user data
+        if (payload.type === "refresh") return null;
+
         if (guard && payload.guard !== guard) return null;
 
         return payload;
@@ -380,7 +437,7 @@ export class JwtGuard {
      *
      * await Auth.jwt().invalidate(token);
      */
-    public static async invalidate(token: string, ttlSeconds?: number): Promise<void> {
+    public static async invalidate(token: string, ttlSeconds?: number | string): Promise<void> {
         const ttl = ttlSeconds ?? jwtConfig.ttl;
         await jwtBlacklist.add(token, ttl);
     }
@@ -404,12 +461,19 @@ export class JwtGuard {
         const token = this.getRequestToken();
         if (!token) return;
 
+        const defaultTtl = parseTtlToSeconds(jwtConfig.ttl, 3600);
         const decoded = jwt.decode(token) as JwtPayload | null;
         const remaining = decoded?.exp
             ? decoded.exp - Math.floor(Date.now() / 1000)
-            : jwtConfig.ttl;
+            : defaultTtl;
 
-        await this.invalidate(token, Math.max(1, remaining));
+        const identifier = decoded?.jti || token;
+        await this.invalidate(identifier, Math.max(1, Math.floor(remaining)));
+
+        // Also revoke paired refresh token if JTI is present
+        if (decoded?.jti) {
+            await jwtRefreshStore.revoke(decoded.jti);
+        }
     }
 
     /**

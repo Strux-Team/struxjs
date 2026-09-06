@@ -43,6 +43,7 @@ export { Gate, UserGateEvaluator } from "./core/auth/Gate.js";
 export { AuthorizationError } from "./core/auth/AuthorizationError.js";
 export { HasRoles } from "./core/auth/HasRoles.js";
 export { CanMiddleware, RoleMiddleware } from "./core/auth/AuthorizeMiddleware.js";
+export { parseTtlToSeconds } from "./core/auth/ttl.js";
 
 // Export Application Lifecycle Core
 export { Application } from "./core/Application.js";

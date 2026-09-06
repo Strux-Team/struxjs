@@ -27,7 +27,7 @@ export class WebSocketServer {
 
                 // Store a promise for async auth — attach message handler synchronously
                 const authPromise = rawToken
-                    ? JwtGuard.tryVerify(rawToken)
+                    ? JwtGuard.tryVerifyAccessToken(rawToken)
                         .then((payload) => {
                             if (payload) user = { id: payload.sub ?? payload.id, ...payload };
                         })
