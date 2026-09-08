@@ -15,6 +15,7 @@ export default defineConfig({
 
     nav: [
       { text: "Getting Started", link: "/guide/getting-started" },
+      { text: "Upgrade Guide", link: "/guide/upgrade" },
       { text: "Routing", link: "/guide/routing" },
       { text: "Controllers", link: "/guide/controllers" },
       { text: "Middleware", link: "/guide/middleware" },
@@ -36,6 +37,7 @@ export default defineConfig({
         items: [
           { text: "What is StruxJS?", link: "/guide/what-is-struxjs" },
           { text: "Getting Started", link: "/guide/getting-started" },
+          { text: "Upgrade Guide", link: "/guide/upgrade" },
           { text: "Directory Structure", link: "/guide/directory-structure" }
         ]
       },
