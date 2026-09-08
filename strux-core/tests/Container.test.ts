@@ -73,4 +73,24 @@ describe("IoC Container", () => {
 
         expect(make("test.value")).toBe(42);
     });
+
+    test("caches constructor dependency resolution plan for transient classes", () => {
+        container.bind(MockDatabaseService, () => new MockDatabaseService());
+
+        // First resolve: compiles plan and caches it
+        const repo1 = container.resolve<UserRepository>(UserRepository);
+        expect(repo1).toBeInstanceOf(UserRepository);
+        expect(repo1.db.name).toBe("SQLite");
+
+        // Second resolve: uses cached plan
+        const repo2 = container.resolve<UserRepository>(UserRepository);
+        expect(repo2).toBeInstanceOf(UserRepository);
+        expect(repo2.db.name).toBe("SQLite");
+        expect(repo1).not.toBe(repo2); // Fresh instance because resolve() was called, but using cached plan
+
+        // clearPlanCache resets the plan cache without breaking subsequent resolution
+        container.clearPlanCache();
+        const repo3 = container.resolve<UserRepository>(UserRepository);
+        expect(repo3).toBeInstanceOf(UserRepository);
+    });
 });

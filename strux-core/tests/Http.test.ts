@@ -380,4 +380,44 @@ describe("HTTP Routing & Dispatching", () => {
         expect(resApi.statusCode).toBe(422);
         expect(JSON.parse(resApi.payload).errors.name).toBeDefined();
     });
+
+    test("caches action parameter resolution plan across multiple requests", async () => {
+        let callCount = 0;
+
+        class CachedActionController {
+            public index(req: any) {
+                callCount++;
+                return { callCount, path: req.url };
+            }
+        }
+
+        container.bind(CachedActionController, () => new CachedActionController());
+
+        Route.get("/cached-action-test", [CachedActionController, "index"]);
+
+        // Request 1: Compiles action resolvers and caches them
+        const res1 = await router.getEngine().inject({
+            method: "GET",
+            url: "/cached-action-test"
+        });
+        expect(res1.statusCode).toBe(200);
+        expect(JSON.parse(res1.payload)).toEqual({ callCount: 1, path: "/cached-action-test" });
+
+        // Request 2: Uses cached resolvers
+        const res2 = await router.getEngine().inject({
+            method: "GET",
+            url: "/cached-action-test"
+        });
+        expect(res2.statusCode).toBe(200);
+        expect(JSON.parse(res2.payload)).toEqual({ callCount: 2, path: "/cached-action-test" });
+
+        // clearActionCache clears cache without breaking subsequent requests
+        router.clearActionCache();
+        const res3 = await router.getEngine().inject({
+            method: "GET",
+            url: "/cached-action-test"
+        });
+        expect(res3.statusCode).toBe(200);
+        expect(JSON.parse(res3.payload)).toEqual({ callCount: 3, path: "/cached-action-test" });
+    });
 });

@@ -28,8 +28,19 @@ interface RouteOptions {
     middlewares?: string[];
 }
 
+export type ActionParamResolver = (
+    req: FastifyRequest,
+    rep: FastifyReply,
+    container: Container
+) => any | Promise<any>;
+
 export class Router {
     private fastify: FastifyInstance;
+    private actionResolverCache: WeakMap<Function, ActionParamResolver[]> = new WeakMap();
+
+    public clearActionCache(): void {
+        this.actionResolverCache = new WeakMap();
+    }
 
     constructor(private container: Container) {
         this.fastify = Fastify({ logger: false });
@@ -242,154 +253,18 @@ export class Router {
 
                         const targetMethod = controllerInstance[methodName];
 
-                        // 4. TWO-LAYER ANTI-COMPILER HYBRID INJECTION ENGINE
-                        const actionParams: any[] = Reflect.getMetadata(ACTION_PARAM_TYPES_KEY, targetMethod) || [];
-
-                        const methodStr = targetMethod.toString();
-                        const paramMatch = methodStr.match(/^[^(]*\(([^)]*)\)/) || methodStr.match(/^\s*async\s+[^(]*\(([^)]*)\)/);
-                        let paramNames: string[] = [];
-
-                        if (paramMatch && paramMatch[1]) {
-                            const rawParamsStr = paramMatch[1].trim();
-                            if (rawParamsStr !== "") {
-                                paramNames = rawParamsStr.split(",").map((param: string) => {
-                                    const parts = param.split(":");
-                                    const rawVarName = parts[0];
-                                    return rawVarName.replace(/[\r\n\t\s]/g, "");
-                                });
-                            }
+                        // 4. TWO-LAYER ANTI-COMPILER HYBRID INJECTION ENGINE (CACHED)
+                        let resolvers = this.actionResolverCache.get(targetMethod);
+                        if (!resolvers) {
+                            resolvers = this.compileActionResolvers(targetMethod);
+                            this.actionResolverCache.set(targetMethod, resolvers);
                         }
 
-
-
-                        const maxParams = Math.max(actionParams.length, paramNames.length);
                         const resolvedActionParams: any[] = [];
-                        const urlParams = (req.params as Record<string, string>) || {};
-
-                        for (let index = 0; index < maxParams; index++) {
-                            const paramType = actionParams[index];
-                            let paramName = paramNames[index] ? paramNames[index].toLowerCase() : "";
-
-                            // PROTECT AGAINST TSX OBFUSCATION: Normalizes 'request2' back to 'request'
-                            if (paramName.includes("request")) {
-                                paramName = "request";
-                            }
-
-                            let injected = false;
-
-                            // LAYER 1: PRIORITIZE VALID METADATA CLASS TYPES
-                            if (paramType && typeof paramType === "function") {
-                                if (paramType.prototype instanceof FormRequest) {
-                                    const formRequestInstance = new (paramType as any)();
-                                    await formRequestInstance.boot(req);
-                                    resolvedActionParams.push(formRequestInstance);
-                                    injected = true;
-                                } else if (paramType !== Object && paramType !== String && paramType !== Number && paramType !== Boolean) {
-                                    resolvedActionParams.push(this.container.make(paramType));
-                                    injected = true;
-                                } else if (paramType.name === "FastifyRequest") {
-                                    resolvedActionParams.push(decorateRequest(req));
-                                    injected = true;
-                                } else if (paramType.name === "FastifyReply") {
-                                    resolvedActionParams.push(decorateResponse(rep));
-                                    injected = true;
-                                }
-                            }
-
-                            // LAYER 2: FALLBACK TO DYNAMIC CONTAINER SCANNER
-                            if (!injected) {
-                                if (paramName.includes("reply") || paramName.includes("response") || paramName === "rep" || paramName === "res") {
-                                    resolvedActionParams.push(decorateResponse(rep));
-                                }
-                                else if (paramName.includes("request") || paramName === "req") {
-                                    try {
-                                        let targetRequestClass: any = null;
-                                        const registeredKeys = Array.from((this.container as any).bindings.keys());
-
-                                        const rawParamName = paramNames[index] ? paramNames[index].toLowerCase() : "";
-                                        const cleanParamName = rawParamName.replace(/\d+$/, "");
-                                        const baseParamName = cleanParamName.replace("request", "");
-
-                                        // Match FormRequest if parameter name specifies or includes the request name (e.g. registerRequest, register, loginRequest)
-                                        for (const key of registeredKeys) {
-                                            if (typeof key === "function" && key.prototype instanceof FormRequest) {
-                                                const className = key.name.toLowerCase();
-                                                const baseClassName = className.replace("request", "");
-
-                                                if (
-                                                    cleanParamName === className ||
-                                                    cleanParamName + "request" === className ||
-                                                    (baseParamName !== "" && className.includes(baseParamName)) ||
-                                                    (baseClassName !== "" && cleanParamName.includes(baseClassName))
-                                                ) {
-                                                    targetRequestClass = key;
-                                                    break;
-                                                }
-                                            }
-                                        }
-
-                                        if (targetRequestClass) {
-                                            const formRequestInstance = new targetRequestClass();
-                                            await formRequestInstance.boot(req);
-                                            resolvedActionParams.push(formRequestInstance);
-                                        } else {
-                                            // Inject standard decorated Request when generic 'request' or 'req' is used
-                                            resolvedActionParams.push(decorateRequest(req));
-                                        }
-                                    } catch (e: any) {
-                                        throw e;
-                                    }
-                                }
-                                else if (paramName === "body") {
-                                    resolvedActionParams.push(req.body || {});
-                                }
-                                else {
-                                    // 1. Prioritize IoC Container Services resolution
-                                    const registeredKeys = Array.from((this.container as any).bindings.keys());
-                                    let matchingServiceKey: any = null;
-
-                                    const rawParamName = paramNames[index] ? paramNames[index].toLowerCase() : "";
-                                    const cleanParamName = rawParamName.replace(/\d+$/, "");
-
-                                    for (const key of registeredKeys) {
-                                        let keyStr = "";
-                                        if (typeof key === "string") {
-                                            keyStr = key.toLowerCase();
-                                        } else if (typeof key === "function") {
-                                            keyStr = key.name.toLowerCase();
-                                        }
-
-                                        if (keyStr !== "" && (keyStr === cleanParamName || keyStr === cleanParamName + "service")) {
-                                            matchingServiceKey = key;
-                                            break;
-                                        }
-                                    }
-
-                                    if (matchingServiceKey) {
-                                        resolvedActionParams.push(this.container.make(matchingServiceKey));
-                                    }
-                                    // 2. Exact or case-insensitive route parameters check
-                                    else {
-                                        const urlParamKeys = Object.keys(urlParams);
-                                        const matchedUrlKey = urlParamKeys.find(k => k.toLowerCase() === cleanParamName);
-
-                                        if (matchedUrlKey !== undefined) {
-                                            resolvedActionParams.push(urlParams[matchedUrlKey]);
-                                        }
-                                        // 3. Fallback for positional URL parameters
-                                        else if (urlParamKeys.length > 0) {
-                                            const unusedUrlKey = urlParamKeys[index] || urlParamKeys[0];
-                                            resolvedActionParams.push(urlParams[unusedUrlKey]);
-                                        }
-                                        else {
-                                            resolvedActionParams.push(req);
-                                        }
-                                    }
-                                }
-                            }
+                        for (let i = 0; i < resolvers.length; i++) {
+                            const val = resolvers[i](req, rep, this.container);
+                            resolvedActionParams.push(val instanceof Promise ? await val : val);
                         }
-
-
 
                         // 5. Synchronously await execution to catch validation exceptions properly
                         const result = await targetMethod.apply(controllerInstance, resolvedActionParams);
@@ -648,5 +523,162 @@ export class Router {
         };
 
         return messages[statusCode] || "Error";
+    }
+
+    /**
+     * Compile and optimize the parameter resolution plan for a controller action.
+     * This eliminates regex parsing, string reflection, and container binding loops on every request.
+     */
+    private compileActionResolvers(targetMethod: Function): ActionParamResolver[] {
+        const actionParams: any[] = Reflect.getMetadata(ACTION_PARAM_TYPES_KEY, targetMethod) || [];
+
+        const methodStr = targetMethod.toString();
+        const paramMatch = methodStr.match(/^[^(]*\(([^)]*)\)/) || methodStr.match(/^\s*async\s+[^(]*\(([^)]*)\)/);
+        let paramNames: string[] = [];
+
+        if (paramMatch && paramMatch[1]) {
+            const rawParamsStr = paramMatch[1].trim();
+            if (rawParamsStr !== "") {
+                paramNames = rawParamsStr.split(",").map((param: string) => {
+                    const parts = param.split(":");
+                    const rawVarName = parts[0];
+                    return rawVarName.replace(/[\r\n\t\s]/g, "");
+                });
+            }
+        }
+
+        const maxParams = Math.max(actionParams.length, paramNames.length);
+        const resolvers: ActionParamResolver[] = [];
+
+        for (let index = 0; index < maxParams; index++) {
+            const paramType = actionParams[index];
+            let paramName = paramNames[index] ? paramNames[index].toLowerCase() : "";
+
+            // PROTECT AGAINST TSX OBFUSCATION: Normalizes 'request2' back to 'request'
+            if (paramName.includes("request")) {
+                paramName = "request";
+            }
+
+            let injected = false;
+
+            // LAYER 1: PRIORITIZE VALID METADATA CLASS TYPES
+            if (paramType && typeof paramType === "function") {
+                if (paramType.prototype instanceof FormRequest) {
+                    resolvers.push(async (req) => {
+                        const formRequestInstance = new (paramType as any)();
+                        await formRequestInstance.boot(req);
+                        return formRequestInstance;
+                    });
+                    injected = true;
+                } else if (paramType !== Object && paramType !== String && paramType !== Number && paramType !== Boolean) {
+                    resolvers.push((_req, _rep, container) => container.make(paramType));
+                    injected = true;
+                } else if (paramType.name === "FastifyRequest") {
+                    resolvers.push((req) => decorateRequest(req));
+                    injected = true;
+                } else if (paramType.name === "FastifyReply") {
+                    resolvers.push((_req, rep) => decorateResponse(rep));
+                    injected = true;
+                }
+            }
+
+            // LAYER 2: FALLBACK TO DYNAMIC CONTAINER SCANNER
+            if (!injected) {
+                if (paramName.includes("reply") || paramName.includes("response") || paramName === "rep" || paramName === "res") {
+                    resolvers.push((_req, rep) => decorateResponse(rep));
+                }
+                else if (paramName.includes("request") || paramName === "req") {
+                    let targetRequestClass: any = null;
+                    const registeredKeys = Array.from((this.container as any).bindings.keys());
+
+                    const rawParamName = paramNames[index] ? paramNames[index].toLowerCase() : "";
+                    const cleanParamName = rawParamName.replace(/\d+$/, "");
+                    const baseParamName = cleanParamName.replace("request", "");
+
+                    // Match FormRequest if parameter name specifies or includes the request name (e.g. registerRequest, register, loginRequest)
+                    for (const key of registeredKeys) {
+                        if (typeof key === "function" && key.prototype instanceof FormRequest) {
+                            const className = key.name.toLowerCase();
+                            const baseClassName = className.replace("request", "");
+
+                            if (
+                                cleanParamName === className ||
+                                cleanParamName + "request" === className ||
+                                (baseParamName !== "" && className.includes(baseParamName)) ||
+                                (baseClassName !== "" && cleanParamName.includes(baseClassName))
+                            ) {
+                                targetRequestClass = key;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (targetRequestClass) {
+                        const reqClass = targetRequestClass;
+                        resolvers.push(async (req) => {
+                            const formRequestInstance = new reqClass();
+                            await formRequestInstance.boot(req);
+                            return formRequestInstance;
+                        });
+                    } else {
+                        resolvers.push((req) => decorateRequest(req));
+                    }
+                }
+                else if (paramName === "body") {
+                    resolvers.push((req) => (req.body as any) || {});
+                }
+                else {
+                    // 1. Prioritize IoC Container Services resolution
+                    const registeredKeys = Array.from((this.container as any).bindings.keys());
+                    let matchingServiceKey: any = null;
+
+                    const rawParamName = paramNames[index] ? paramNames[index].toLowerCase() : "";
+                    const cleanParamName = rawParamName.replace(/\d+$/, "");
+
+                    for (const key of registeredKeys) {
+                        let keyStr = "";
+                        if (typeof key === "string") {
+                            keyStr = key.toLowerCase();
+                        } else if (typeof key === "function") {
+                            keyStr = key.name.toLowerCase();
+                        }
+
+                        if (keyStr !== "" && (keyStr === cleanParamName || keyStr === cleanParamName + "service")) {
+                            matchingServiceKey = key;
+                            break;
+                        }
+                    }
+
+                    if (matchingServiceKey) {
+                        const serviceKey = matchingServiceKey;
+                        resolvers.push((_req, _rep, container) => container.make(serviceKey));
+                    }
+                    // 2. Exact or case-insensitive route parameters check
+                    else {
+                        const targetCleanName = cleanParamName;
+                        const paramIdx = index;
+                        resolvers.push((req) => {
+                            const currentUrlParams = (req.params as Record<string, string>) || {};
+                            const urlParamKeys = Object.keys(currentUrlParams);
+                            const matchedUrlKey = urlParamKeys.find(k => k.toLowerCase() === targetCleanName);
+
+                            if (matchedUrlKey !== undefined) {
+                                return currentUrlParams[matchedUrlKey];
+                            }
+                            // 3. Fallback for positional URL parameters
+                            else if (urlParamKeys.length > 0) {
+                                const unusedUrlKey = urlParamKeys[paramIdx] || urlParamKeys[0];
+                                return currentUrlParams[unusedUrlKey];
+                            }
+                            else {
+                                return req;
+                            }
+                        });
+                    }
+                }
+            }
+        }
+
+        return resolvers;
     }
 }

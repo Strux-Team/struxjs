@@ -12,9 +12,18 @@ interface Binding {
 export class Container {
     // Master map to manage all string tokens and manual registrations
     private bindings: Map<any, Binding> = new Map();
+    // Cache for pre-compiled constructor parameter resolution plans
+    private planCache: WeakMap<any, ((container: Container) => any)[]> = new WeakMap();
 
     constructor() {
         (globalThis as any).__STRUXJS_CONTAINER__ = this;
+    }
+
+    /**
+     * Clear cached dependency injection plans (useful in testing or HMR)
+     */
+    public clearPlanCache(): void {
+        this.planCache = new WeakMap();
     }
 
     /**
@@ -79,6 +88,13 @@ export class Container {
      * Automatically inspect parameter index maps and recursively inject constructor dependencies
      */
     public resolve<T>(target: any): T {
+        // Fast path: use cached constructor resolution plan if available
+        const cachedPlan = this.planCache.get(target);
+        if (cachedPlan) {
+            const dependencies = cachedPlan.map((resolver) => resolver(this));
+            return new target(...dependencies);
+        }
+
         // 1. Get types array from metadata
         const constructorParams: any[] = Reflect.getMetadata(PREC_PARAM_TYPES_KEY, target) ||
             Reflect.getMetadata("design:paramtypes", target) || [];
@@ -101,12 +117,15 @@ export class Container {
         }
 
         const maxParams = Math.max(constructorParams.length, Object.keys(injectedTokens).length, paramNames.length);
+        const plan: ((container: Container) => any)[] = [];
         const dependencies: any[] = [];
 
         for (let index = 0; index < maxParams; index++) {
             // RULE 1: If @Inject('token') is present at this index -> resolve token immediately
             if (injectedTokens[index]) {
-                dependencies.push(this.make(injectedTokens[index]));
+                const token = injectedTokens[index];
+                plan.push((c) => c.make(token));
+                dependencies.push(this.make(token));
             }
             // RULE 2: If @Inject is absent, perform intelligent auto-resolution
             else {
@@ -115,6 +134,7 @@ export class Container {
 
                 // If data type is valid and not raw Object/undefined -> recursively resolve by Class
                 if (paramType && paramType !== String && paramType !== Number && paramType !== Boolean && paramType !== Object && paramType !== Array) {
+                    plan.push((c) => c.make(paramType));
                     dependencies.push(this.make(paramType));
                 }
                 // IF TYPESCRIPT RETURNS UNDEFINED OR OBJECT DUE TO FILE LOADING ORDER:
@@ -126,6 +146,7 @@ export class Container {
                     // 1. Try explicit token guesses
                     for (const candidate of [guessedClassName, `${guessedClassName}Service`, paramName]) {
                         if (this.bindings.has(candidate)) {
+                            plan.push((c) => c.make(candidate));
                             dependencies.push(this.make(candidate));
                             resolved = true;
                             break;
@@ -147,6 +168,7 @@ export class Container {
                                 (capitals.length >= 2 && (capitals === cleanParam || capitals.endsWith(cleanParam)));
 
                             if (isMatch) {
+                                plan.push((c) => c.make(key));
                                 dependencies.push(this.make(key));
                                 resolved = true;
                                 break;
@@ -165,6 +187,9 @@ export class Container {
                 }
             }
         }
+
+        // Cache the compiled resolution plan
+        this.planCache.set(target, plan);
 
         return new target(...dependencies);
     }

@@ -1,4 +1,4 @@
-import { Auth, Request, Response, view } from "struxjs";
+import { Auth, Request, view } from "struxjs";
 
 export class LoginController {
     public async index() {
@@ -11,7 +11,6 @@ export class LoginController {
         const ok = await Auth.attempt({ email, password });
 
         console.log(ok);
-
 
         return 'ok';
     }
