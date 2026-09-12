@@ -340,13 +340,16 @@ HasRoles.hasAllRoles(user, ["editor", "user"]); // true if has all
 HasRoles.hasPermissionTo(user, "publish-post");
 // Note: users with "admin" or "super-admin" role pass all permission checks
 
-// Assign / remove roles (in-memory only - save to DB separately)
+// Assign / remove roles on the model instance:
 HasRoles.assignRole(user, "editor");
-HasRoles.removeRole(user, "editor");
+HasRoles.removeRole(user, "moderator");
 
-// Grant / revoke permissions
+// Grant / revoke permissions:
 HasRoles.givePermissionTo(user, "publish-post", "delete-post");
 HasRoles.revokePermissionTo(user, "delete-post");
+
+// Persist updated roles/permissions to the Database:
+await user.save();
 ```
 
 ### Gate fallback
