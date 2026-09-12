@@ -208,7 +208,121 @@ Gate.after((user, ability, result) => {
 
 ## Role-Based Access Control
 
-StruxJS reads roles from the `user.roles` array and permissions from `user.permissions` array on your user model. No special database structure is required - store them however fits your schema.
+StruxJS does **not** force a rigid database schema for roles and permissions. Instead, `HasRoles` flexibly extracts roles and permissions from your User model regardless of how your database is designed.
+
+### Database Schema Options
+
+You can implement RBAC using any of the following 3 common database designs:
+
+#### Option 1: Single Role Column (Simplest & Most Common)
+
+For applications where each user only possesses one primary role (e.g., `admin`, `editor`, `user`):
+
+```typescript
+// database/migrations/xxxx_create_users_table.ts
+await Schema.create("users", (table) => {
+    table.increments("id").primary();
+    table.string("name");
+    table.string("email").unique();
+    table.string("password");
+    table.string("role").defaultTo("user"); // e.g. "admin", "editor", "user"
+    table.timestamps();
+});
+```
+
+In your User model:
+
+```typescript
+// app/Models/User.ts
+export class User extends BaseModel {
+    protected table = "users";
+    public role!: string;
+}
+```
+
+`HasRoles.hasRole(user, "admin")` automatically inspects `user.role === "admin"`.
+
+---
+
+#### Option 2: JSON Array Columns (Modern & Flexible)
+
+For applications where users can hold multiple roles and custom permissions without the overhead of extra pivot tables:
+
+```typescript
+// database/migrations/xxxx_create_users_table.ts
+await Schema.create("users", (table) => {
+    table.increments("id").primary();
+    table.string("name");
+    table.string("email").unique();
+    table.string("password");
+    table.json("roles").nullable();       // e.g. ["admin", "editor"]
+    table.json("permissions").nullable(); // e.g. ["publish-post", "delete-post"]
+    table.timestamps();
+});
+```
+
+In your User model, define attribute casting:
+
+```typescript
+// app/Models/User.ts
+export class User extends BaseModel {
+    protected table = "users";
+
+    public casts = {
+        roles: "json",
+        permissions: "json",
+    };
+}
+```
+
+You can now store arrays directly:
+
+```typescript
+await User.create({
+    name: "John Doe",
+    email: "john@example.com",
+    password: await Auth.hashPassword("secret"),
+    roles: ["admin", "editor"],
+    permissions: ["publish-post", "manage-users"],
+});
+```
+
+---
+
+#### Option 3: Relational Pivot Tables (Enterprise Dynamic RBAC)
+
+For complex enterprise applications where roles and permissions are dynamically managed via an Admin Dashboard:
+
+1. **Tables Structure:**
+   * `users` (`id`, `name`, `email`, ...)
+   * `roles` (`id`, `name`, `slug`)
+   * `permissions` (`id`, `name`, `slug`)
+   * `role_user` (`user_id`, `role_id`)
+   * `permission_role` (`permission_id`, `role_id`)
+
+2. **In your User model, define getters for `roles` and `permissions`:**
+
+```typescript
+// app/Models/User.ts
+import { BaseModel } from "struxjs";
+import { Role } from "./Role.js";
+
+export class User extends BaseModel {
+    protected table = "users";
+
+    public rolesRelation() {
+        return this.belongsToMany(Role, "role_user", "user_id", "role_id");
+    }
+
+    // Expose array of role slugs/names to HasRoles and Gate:
+    public get roles(): string[] {
+        const loaded = this.relations?.rolesRelation || this.relations?.roles;
+        return Array.isArray(loaded) ? loaded.map((r: any) => r.slug || r.name) : [];
+    }
+}
+```
+
+---
 
 ### `HasRoles` utility
 
