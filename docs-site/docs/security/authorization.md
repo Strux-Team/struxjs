@@ -76,16 +76,47 @@ await Gate.authorize("edit-post", post);
 
 Catch it or let the global error handler return a 403 automatically.
 
-### Checking for a specific user
+### `Gate.forUser(user)` - Checking for a specific user
 
-Use `Gate.forUser(user)` to evaluate an ability against an explicit user instead of the current session user:
+By default, `Gate.allows()`, `Gate.denies()`, and `Gate.authorize()` automatically inspect the currently authenticated user in the active request context.
+
+If you need to evaluate an ability for an **explicit user instance** (for example: in Queue Jobs, CLI commands, or when an admin checks permissions on behalf of another user), use `Gate.forUser(user)`:
 
 ```typescript
-const evaluator = Gate.forUser(targetUser);
+import { Gate } from "struxjs";
 
-if (await evaluator.allows("edit-post", post)) { ... }
-await evaluator.authorize("delete-post", post);
+const user = await User.find(userId);
+const evaluator = Gate.forUser(user);
+
+// 1. Evaluate with allows() -> returns boolean
+if (await evaluator.allows("edit-post", post)) {
+    console.log("User is permitted to edit this post.");
+}
+
+// 2. Evaluate with denies() -> returns boolean
+if (await evaluator.denies("delete-post", post)) {
+    console.log("User cannot delete this post.");
+}
+
+// 3. Evaluate with authorize() -> throws AuthorizationError on denial
+await evaluator.authorize("publish-post", post);
 ```
+
+#### Common Use Cases for `Gate.forUser(user)`
+
+* **Queue Jobs & Background Workers:** Background workers run outside of an HTTP request lifecycle (no cookies or headers). Pass the job's target user to `Gate.forUser()`:
+  ```typescript
+  export class ProcessSubscriptionJob implements Job {
+      public async handle() {
+          const user = await User.find(this.userId);
+          if (await Gate.forUser(user).allows("access-premium-features")) {
+              // process premium features
+          }
+      }
+  }
+  ```
+* **Console Commands & Cron Tasks:** When executing CLI commands or scheduled tasks on behalf of specific user accounts.
+* **Administrative Impersonation & Delegation:** When checking whether a team member, collaborator, or sub-account has permission to access a resource.
 
 ---
 
