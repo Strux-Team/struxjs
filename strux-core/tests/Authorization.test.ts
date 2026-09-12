@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach } from "vitest";
-import { Gate, AuthorizationError, HasRoles, TemplateEngine, Auth, JwtGuard, BaseModel, Schema, CanMiddleware, RoleMiddleware, PermissionMiddleware } from "../src/index.js";
+import { Gate, AuthorizationError, HasRoles, TemplateEngine, Auth, JwtGuard, BaseModel, Schema, CanMiddleware, RoleMiddleware, PermissionMiddleware, can, role, permission } from "../src/index.js";
 import { httpContextStorage } from "../src/core/http/HttpContext.js";
 
 // Mock User Model
@@ -423,6 +423,116 @@ describe("Authorization and RBAC System", () => {
                     expect(user).not.toBeNull();
                     expect(user?.id).toBe(1);
                     expect(user?.name).toBe("Admin");
+                }
+            );
+        });
+
+        test("CanMiddleware, RoleMiddleware, PermissionMiddleware work with constructor instances and helpers", async () => {
+            Gate.define("edit-post", (user) => {
+                return user && HasRoles.hasRole(user, "admin");
+            });
+
+            // 1. CanMiddleware instance & can() helper
+            const canInstance = new CanMiddleware("edit-post");
+            const canHelper = can("edit-post");
+            expect(canInstance.toString()).toBe("can:edit-post");
+            expect(canHelper.toString()).toBe("can:edit-post");
+
+            let canStatus = 200;
+            const mockReply = {
+                status(code: number) {
+                    canStatus = code;
+                    return this;
+                },
+                send() {
+                    return this;
+                }
+            };
+
+            // Allowed for admin
+            await httpContextStorage.run(
+                {
+                    request: { headers: { authorization: `Bearer ${adminToken}` } } as any,
+                    reply: mockReply as any,
+                    userCache: new Map(),
+                },
+                async () => {
+                    await canInstance.handle({ headers: { authorization: `Bearer ${adminToken}` } } as any, mockReply as any);
+                    expect(canStatus).toBe(200);
+
+                    await canHelper.handle({ headers: { authorization: `Bearer ${adminToken}` } } as any, mockReply as any);
+                    expect(canStatus).toBe(200);
+                }
+            );
+
+            // Denied for regular user (403)
+            await httpContextStorage.run(
+                {
+                    request: { headers: { authorization: `Bearer ${userToken}` } } as any,
+                    reply: mockReply as any,
+                    userCache: new Map(),
+                },
+                async () => {
+                    await canInstance.handle({ headers: { authorization: `Bearer ${userToken}` } } as any, mockReply as any);
+                    expect(canStatus).toBe(403);
+                }
+            );
+
+            // 2. RoleMiddleware instance & role() helper
+            const roleInstance = new RoleMiddleware("admin");
+            const roleHelper = role("admin", "editor");
+            expect(roleInstance.toString()).toBe("role:admin");
+            expect(roleHelper.toString()).toBe("role:admin,editor");
+
+            let roleStatus = 200;
+            const mockRoleReply = {
+                status(code: number) {
+                    roleStatus = code;
+                    return this;
+                },
+                send() {
+                    return this;
+                }
+            };
+
+            await httpContextStorage.run(
+                {
+                    request: { headers: { authorization: `Bearer ${userToken}` } } as any,
+                    reply: mockRoleReply as any,
+                    userCache: new Map(),
+                },
+                async () => {
+                    await roleInstance.handle({ headers: { authorization: `Bearer ${userToken}` } } as any, mockRoleReply as any);
+                    expect(roleStatus).toBe(403);
+                }
+            );
+
+            // 3. PermissionMiddleware instance & permission() helper
+            const permInstance = new PermissionMiddleware("delete-post");
+            const permHelper = permission("publish-post", "delete-post");
+            expect(permInstance.toString()).toBe("permission:delete-post");
+            expect(permHelper.toString()).toBe("permission:publish-post,delete-post");
+
+            let permStatus = 200;
+            const mockPermReply = {
+                status(code: number) {
+                    permStatus = code;
+                    return this;
+                },
+                send() {
+                    return this;
+                }
+            };
+
+            await httpContextStorage.run(
+                {
+                    request: { headers: { authorization: `Bearer ${adminToken}` } } as any,
+                    reply: mockPermReply as any,
+                    userCache: new Map(),
+                },
+                async () => {
+                    await permInstance.handle({ headers: { authorization: `Bearer ${adminToken}` } } as any, mockPermReply as any);
+                    expect(permStatus).toBe(200);
                 }
             );
         });

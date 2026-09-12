@@ -367,24 +367,35 @@ const isAdmin = await Gate.allows("admin");
 
 ### `CanMiddleware` - ability check
 
-Protect a route by requiring a Gate ability. Import it directly from `struxjs`:
+Protect a route by requiring a Gate ability. You have 3 convenient ways to pass the gate/ability name:
+
+#### 1. Using instance or helper (no service provider binding required)
+You can pass the ability directly to the constructor or use the fluent helper:
 
 ```typescript
-import { Route } from "struxjs";
-import { CanMiddleware } from "struxjs";
+import { Route, CanMiddleware, can } from "struxjs";
 
-// Using class reference directly
+// Option A: Pass ability to constructor
 Route.post("/posts/:id/publish", [PostController, "publish"])
-    .middleware(CanMiddleware);
+    .middleware(new CanMiddleware("publish-post"));
+
+// Option B: Use fluent helper function can()
+Route.post("/posts/:id/publish", [PostController, "publish"])
+    .middleware(can("publish-post"));
+
+// Option C: Use static factory method
+Route.post("/posts/:id/publish", [PostController, "publish"])
+    .middleware(CanMiddleware.ability("publish-post"));
 ```
 
-To use the string alias format `"can:ability"`, register it first in `AppServiceProvider`:
+#### 2. Using string alias (`"can:ability"`)
+Register `can` in `AppServiceProvider`:
 
 ```typescript
 container.bind("can", (c) => c.make(CanMiddleware));
 ```
 
-Then:
+Then in routes:
 
 ```typescript
 Route.post("/posts/:id/publish", [PostController, "publish"])
@@ -393,16 +404,20 @@ Route.post("/posts/:id/publish", [PostController, "publish"])
 
 ### `RoleMiddleware` - role check
 
-Restrict a route to users with a specific role:
+Restrict a route to users with specific roles:
 
 ```typescript
-import { RoleMiddleware } from "struxjs";
+import { RoleMiddleware, role } from "struxjs";
 
-// Single role
+// Instance constructor
 Route.get("/admin", [AdminController, "index"])
-    .middleware("role:admin");
+    .middleware(new RoleMiddleware("admin"));
 
-// Multiple roles (any match)
+// Multiple roles using fluent helper
+Route.get("/dashboard", [DashboardController, "index"])
+    .middleware(role("admin", "editor"));
+
+// String alias (requires container binding)
 Route.get("/dashboard", [DashboardController, "index"])
     .middleware("role:admin,editor");
 ```
@@ -412,13 +427,22 @@ Route.get("/dashboard", [DashboardController, "index"])
 Restrict a route to users with a specific permission:
 
 ```typescript
-import { PermissionMiddleware } from "struxjs";
+import { PermissionMiddleware, permission } from "struxjs";
 
+// Instance constructor
+Route.post("/posts", [PostController, "store"])
+    .middleware(new PermissionMiddleware("publish-post"));
+
+// Fluent helper
+Route.post("/posts", [PostController, "store"])
+    .middleware(permission("publish-post"));
+
+// String alias (requires container binding)
 Route.post("/posts", [PostController, "store"])
     .middleware("permission:publish-post");
 ```
 
-Register middlewares in `AppServiceProvider` to use string aliases:
+Register middlewares in `AppServiceProvider` if you prefer using string aliases:
 
 ```typescript
 import { CanMiddleware, RoleMiddleware, PermissionMiddleware } from "struxjs";
