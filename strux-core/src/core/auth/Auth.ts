@@ -118,12 +118,17 @@ export class Auth {
     }
 
     /**
-     * Check whether a user is currently authenticated.
+     * Check whether a user is currently authenticated (via Session or JWT).
      *
      * if (Auth.check()) { ... }
      */
     public static check(): boolean {
         try {
+            const store = httpContextStorage.getStore();
+            if (store) {
+                const req = decorateRequest(store.request);
+                if (req.user() !== null) return true;
+            }
             const session = this.getSession();
             const id = session.get("_auth_id");
             return id !== undefined && id !== null;
@@ -142,13 +147,21 @@ export class Auth {
     }
 
     /**
-     * Get the primary key of the currently authenticated user.
+     * Get the primary key of the currently authenticated user (Session or attached JWT user).
      * Returns null when unauthenticated.
      *
      * const userId = Auth.id();
      */
     public static id(): any {
         try {
+            const store = httpContextStorage.getStore();
+            if (store) {
+                const req = decorateRequest(store.request);
+                const u = req.user();
+                if (u) {
+                    return (u as any).attributes?.id ?? (u as any).id ?? null;
+                }
+            }
             return this.getSession().get("_auth_id") ?? null;
         } catch {
             return null;
@@ -157,41 +170,59 @@ export class Auth {
 
     /**
      * Resolve and return the full authenticated user model instance.
+     * Checks request attached user -> Session user -> JWT Bearer token user.
      * Result is cached in the request context — DB is only queried once per request.
      *
      * const user = await Auth.user<User>();
      */
     public static async user<T extends BaseModel = BaseModel>(guard?: string): Promise<T | null> {
-        const id = this.id();
-        if (!id) return null;
-
-        const session = this.getSession();
-        const resolvedGuard = guard ?? session.get("_auth_guard") ?? "web";
-
-        // Check request-scoped cache first
         const store = httpContextStorage.getStore();
-        const cacheKey = `session:${resolvedGuard}:${id}`;
-        if (store?.userCache.has(cacheKey)) {
-            return store.userCache.get(cacheKey) as T;
+        if (store) {
+            const req = decorateRequest(store.request);
+            const attached = req.user<T>();
+            if (attached) return attached;
         }
 
-        const ModelClass = guardRegistry.get(resolvedGuard);
+        const id = this.id();
+        if (id) {
+            try {
+                const session = this.getSession();
+                const resolvedGuard = guard ?? session.get("_auth_guard") ?? "web";
 
-        if (!ModelClass) {
-            throw new Error(
-                `[StruxJS Auth Error]: No model registered for guard '${resolvedGuard}'. ` +
-                `Call Auth.extend('${resolvedGuard}', YourModel) during bootstrap.`
-            );
+                // Check request-scoped cache first
+                const cacheKey = `session:${resolvedGuard}:${id}`;
+                if (store?.userCache.has(cacheKey)) {
+                    return store.userCache.get(cacheKey) as T;
+                }
+
+                const ModelClass = guardRegistry.get(resolvedGuard);
+                if (ModelClass) {
+                    const user = await (ModelClass as any).find(id) as T | null;
+                    if (store && user) {
+                        store.userCache.set(cacheKey, user);
+                        decorateRequest(store.request).setUser(user);
+                    }
+                    if (user) return user;
+                }
+            } catch {
+                // Ignore session lookup failures
+            }
         }
 
-        const user = await (ModelClass as any).find(id) as T | null;
-
-        // Store in cache for the lifetime of this request
-        if (store && user) {
-            store.userCache.set(cacheKey, user);
+        // Fallback: check JWT Bearer token if present
+        try {
+            const jwtUser = await this.jwt().user<T>(guard || "api");
+            if (jwtUser) {
+                if (store) {
+                    decorateRequest(store.request).setUser(jwtUser);
+                }
+                return jwtUser;
+            }
+        } catch {
+            // Ignore JWT resolution failures
         }
 
-        return user;
+        return null;
     }
 
     /**

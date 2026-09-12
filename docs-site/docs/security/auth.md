@@ -284,12 +284,22 @@ Route.get("/admin/stats", [AdminController, "stats"])
 
 ### Reading the authenticated user in API controllers
 
+When a route is protected by `ApiAuthMiddleware`, the authenticated user is automatically resolved and attached to the request context. You can retrieve the user in any of the following ways:
+
 ```typescript
-import { Auth } from "struxjs";
+import { Auth, Request, Response } from "struxjs";
 
 export class UserController {
     public async me(request: Request, response: Response) {
-        const user = await Auth.jwt().user<User>();
+        // Option 1 (Fastest): Directly from the request (already attached by ApiAuthMiddleware)
+        const user = request.user<User>();
+
+        // Option 2: Via the unified Auth facade (auto-resolves Session or JWT)
+        const userViaAuth = await Auth.user<User>();
+
+        // Option 3: Explicitly via JWT Guard
+        const userViaJwt = await Auth.jwt().user<User>();
+
         return response.json({ user });
     }
 }
@@ -372,6 +382,8 @@ Auth.configureJwt({
 | Middleware | Alias | Purpose |
 | :--- | :--- | :--- |
 | `AuthMiddleware` | `"auth"` | Session auth - redirect to `/login` or `401 JSON` |
-| `ApiAuthMiddleware` | `"apiauth"` | JWT auth - verify Bearer token, `401` on failure |
+| `ApiAuthMiddleware` | `"apiauth"` | JWT auth - verify Bearer token, attach user to `request.user()`, `401` on failure |
 
-Both files are in `app/Middleware/` and can be modified freely to match your application's requirements - change the redirect path, add logging, attach the user to the request, etc.
+Both files are generated in `app/Middleware/` and can be customized freely. Because `ApiAuthMiddleware` attaches the authenticated user directly to the request context (`request.setUser(user)`), downstream authorization middlewares (such as `role:admin`, `can:ability`, and `permission:action`) work seamlessly without extra database queries.
+
+For role and ability checks on authenticated routes, see the [Authorization Documentation](/security/authorization).

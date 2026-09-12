@@ -50,6 +50,20 @@ export class ApiAuthMiddleware implements Middleware {
             return;
         }
 
-        // Token is valid — request proceeds to the Controller
+        // Token is valid — resolve user and attach to request context for downstream middlewares & controllers
+        const user = await Auth.jwt().user(guard);
+        if (!user) {
+            reply.status(401).send({
+                message: "Unauthenticated. User not found."
+            });
+            return;
+        }
+
+        const req = request as any;
+        if (typeof req.setUser === "function") {
+            req.setUser(user);
+        } else {
+            req._authUser = user;
+        }
     }
 }

@@ -1,5 +1,6 @@
 import { describe, test, expect, beforeEach } from "vitest";
-import { Gate, AuthorizationError, HasRoles, TemplateEngine } from "../src/index.js";
+import { Gate, AuthorizationError, HasRoles, TemplateEngine, Auth, JwtGuard, BaseModel, Schema, CanMiddleware, RoleMiddleware, PermissionMiddleware } from "../src/index.js";
+import { httpContextStorage } from "../src/core/http/HttpContext.js";
 
 // Mock User Model
 class TestUser {
@@ -134,5 +135,296 @@ describe("Authorization and RBAC System", () => {
         const userResult = executor(regularUser);
         expect(userResult).not.toContain("<p>Admin Area</p>");
         expect(userResult).not.toContain("<button>Create User</button>");
+    });
+
+    describe("Authorization with JWT and Middleware", () => {
+        class AuthUserMock extends BaseModel {
+            public table = "auth_users_gate_test";
+            public id!: number;
+            public name!: string;
+            public roles!: string[];
+            public permissions!: string[];
+        }
+
+        let adminToken: string;
+        let userToken: string;
+
+        beforeEach(async () => {
+            await BaseModel.bootConnection({
+                client: "sqlite3",
+                connection: { filename: ":memory:" },
+                useNullAsDefault: true,
+            });
+
+            await Schema.dropTableIfExists("auth_users_gate_test");
+            await Schema.create("auth_users_gate_test", (table) => {
+                table.integer("id").primary();
+                table.string("name");
+                table.json("roles");
+                table.json("permissions");
+            });
+
+            await BaseModel.connection()("auth_users_gate_test").insert([
+                { id: 1, name: "Admin", roles: JSON.stringify(["admin"]), permissions: JSON.stringify(["delete-post", "manage-users"]) },
+                { id: 2, name: "User", roles: JSON.stringify(["user"]), permissions: JSON.stringify(["create-post"]) },
+            ]);
+
+            Auth.extend("api", AuthUserMock);
+            Auth.configureJwt({
+                secret: "super-secret-authorization-jwt-test-key",
+                ttl: 3600,
+            });
+
+            const adminModel = new AuthUserMock();
+            (adminModel as any).id = 1;
+            adminToken = JwtGuard.issueToken(adminModel, "api");
+
+            const userModel = new AuthUserMock();
+            (userModel as any).id = 2;
+            userToken = JwtGuard.issueToken(userModel, "api");
+        });
+
+        test("Gate.allows() automatically resolves user from JWT Bearer token", async () => {
+            Gate.define("manage-users", (user) => {
+                return user && HasRoles.hasRole(user, "admin");
+            });
+
+            // Admin token request context
+            await httpContextStorage.run(
+                {
+                    request: { headers: { authorization: `Bearer ${adminToken}` } } as any,
+                    reply: {} as any,
+                    userCache: new Map(),
+                },
+                async () => {
+                    expect(await Gate.allows("manage-users")).toBe(true);
+                    expect(await Gate.denies("manage-users")).toBe(false);
+                }
+            );
+
+            // Regular user token request context
+            await httpContextStorage.run(
+                {
+                    request: { headers: { authorization: `Bearer ${userToken}` } } as any,
+                    reply: {} as any,
+                    userCache: new Map(),
+                },
+                async () => {
+                    expect(await Gate.allows("manage-users")).toBe(false);
+                    expect(await Gate.denies("manage-users")).toBe(true);
+                }
+            );
+        });
+
+        test("Gate.authorize() succeeds for authorized JWT user and throws for unauthorized", async () => {
+            Gate.define("manage-users", (user) => {
+                return user && HasRoles.hasRole(user, "admin");
+            });
+
+            await httpContextStorage.run(
+                {
+                    request: { headers: { authorization: `Bearer ${adminToken}` } } as any,
+                    reply: {} as any,
+                    userCache: new Map(),
+                },
+                async () => {
+                    await expect(Gate.authorize("manage-users")).resolves.toBe(true);
+                }
+            );
+
+            await httpContextStorage.run(
+                {
+                    request: { headers: { authorization: `Bearer ${userToken}` } } as any,
+                    reply: {} as any,
+                    userCache: new Map(),
+                },
+                async () => {
+                    await expect(Gate.authorize("manage-users")).rejects.toThrow(AuthorizationError);
+                }
+            );
+        });
+
+        test("RoleMiddleware works seamlessly with JWT Bearer token", async () => {
+            const roleMiddleware = new RoleMiddleware();
+
+            // Admin user accessing role:admin
+            let adminStatus = 200;
+            let adminBody: any = null;
+            const mockAdminReply = {
+                status(code: number) {
+                    adminStatus = code;
+                    return this;
+                },
+                send(data: any) {
+                    adminBody = data;
+                    return this;
+                }
+            };
+
+            await httpContextStorage.run(
+                {
+                    request: { headers: { authorization: `Bearer ${adminToken}` } } as any,
+                    reply: mockAdminReply as any,
+                    userCache: new Map(),
+                },
+                async () => {
+                    await roleMiddleware.handle(
+                        { headers: { authorization: `Bearer ${adminToken}` } } as any,
+                        mockAdminReply as any,
+                        "admin"
+                    );
+                    expect(adminStatus).toBe(200);
+                    expect(adminBody).toBeNull();
+                }
+            );
+
+            // Regular user accessing role:admin -> must be rejected with 403
+            let userStatus = 200;
+            let userBody: any = null;
+            const mockUserReply = {
+                status(code: number) {
+                    userStatus = code;
+                    return this;
+                },
+                send(data: any) {
+                    userBody = data;
+                    return this;
+                }
+            };
+
+            await httpContextStorage.run(
+                {
+                    request: { headers: { authorization: `Bearer ${userToken}` } } as any,
+                    reply: mockUserReply as any,
+                    userCache: new Map(),
+                },
+                async () => {
+                    await roleMiddleware.handle(
+                        { headers: { authorization: `Bearer ${userToken}` } } as any,
+                        mockUserReply as any,
+                        "admin"
+                    );
+                    expect(userStatus).toBe(403);
+                    expect(userBody.statusCode).toBe(403);
+                    expect(userBody.message).toContain("Requires one of the following roles: [admin]");
+                }
+            );
+        });
+
+        test("CanMiddleware works seamlessly with JWT Bearer token", async () => {
+            const canMiddleware = new CanMiddleware();
+
+            Gate.define("create-post", (user) => {
+                return user && HasRoles.hasRole(user, "user");
+            });
+
+            let userStatus = 200;
+            let userBody: any = null;
+            const mockUserReply = {
+                status(code: number) {
+                    userStatus = code;
+                    return this;
+                },
+                send(data: any) {
+                    userBody = data;
+                    return this;
+                }
+            };
+
+            await httpContextStorage.run(
+                {
+                    request: { headers: { authorization: `Bearer ${userToken}` } } as any,
+                    reply: mockUserReply as any,
+                    userCache: new Map(),
+                },
+                async () => {
+                    await canMiddleware.handle(
+                        { headers: { authorization: `Bearer ${userToken}` } } as any,
+                        mockUserReply as any,
+                        "create-post"
+                    );
+                    expect(userStatus).toBe(200);
+                    expect(userBody).toBeNull();
+                }
+            );
+
+            // Test unauthorized ability
+            let forbiddenStatus = 200;
+            let forbiddenBody: any = null;
+            const mockForbiddenReply = {
+                status(code: number) {
+                    forbiddenStatus = code;
+                    return this;
+                },
+                send(data: any) {
+                    forbiddenBody = data;
+                    return this;
+                }
+            };
+
+            await httpContextStorage.run(
+                {
+                    request: { headers: { authorization: `Bearer ${userToken}` } } as any,
+                    reply: mockForbiddenReply as any,
+                    userCache: new Map(),
+                },
+                async () => {
+                    await canMiddleware.handle(
+                        { headers: { authorization: `Bearer ${userToken}` } } as any,
+                        mockForbiddenReply as any,
+                        "non-existent-ability"
+                    );
+                    expect(forbiddenStatus).toBe(403);
+                    expect(forbiddenBody.message).toContain("unauthorized");
+                }
+            );
+        });
+
+        test("PermissionMiddleware works seamlessly with JWT Bearer token", async () => {
+            const permissionMiddleware = new PermissionMiddleware();
+
+            let adminStatus = 200;
+            const mockAdminReply = {
+                status(code: number) {
+                    adminStatus = code;
+                    return this;
+                },
+                send(data: any) {
+                    return this;
+                }
+            };
+
+            await httpContextStorage.run(
+                {
+                    request: { headers: { authorization: `Bearer ${adminToken}` } } as any,
+                    reply: mockAdminReply as any,
+                    userCache: new Map(),
+                },
+                async () => {
+                    await permissionMiddleware.handle(
+                        { headers: { authorization: `Bearer ${adminToken}` } } as any,
+                        mockAdminReply as any,
+                        "delete-post"
+                    );
+                    expect(adminStatus).toBe(200);
+                }
+            );
+        });
+
+        test("Auth.user() resolves JWT user automatically when no session is present", async () => {
+            await httpContextStorage.run(
+                {
+                    request: { headers: { authorization: `Bearer ${adminToken}` } } as any,
+                    reply: {} as any,
+                    userCache: new Map(),
+                },
+                async () => {
+                    const user = await Auth.user<AuthUserMock>("api");
+                    expect(user).not.toBeNull();
+                    expect(user?.id).toBe(1);
+                    expect(user?.name).toBe("Admin");
+                }
+            );
+        });
     });
 });

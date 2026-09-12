@@ -24,7 +24,7 @@ StruxJS projects created via `create-strux-app` alias `struxjs-core` to `struxjs
 
 ```json
 "dependencies": {
-  "struxjs": "npm:struxjs-core@^1.0.9"
+  "struxjs": "npm:struxjs-core@^1.0.10"
 }
 ```
 
@@ -63,7 +63,7 @@ Alternatively, you can manually update the version number in your `package.json`
 ```json
 {
   "dependencies": {
-    "struxjs": "npm:struxjs-core@^1.0.9"
+    "struxjs": "npm:struxjs-core@^1.0.10"
   }
 }
 ```
@@ -90,6 +90,37 @@ npm test
 
 # Start in development mode
 npm run dev
+```
+
+---
+
+## Upgrading to v1.0.10 (from v1.0.9)
+
+### Dual-Guard Authorization (JWT & Session Support)
+
+Prior to `1.0.10`, authorization checks (`Gate.allows()`, `Gate.authorize()`, `CanMiddleware`, `RoleMiddleware`) strictly inspected the Web Session cookie (`_auth_id`), which meant JWT-authenticated requests (`Authorization: Bearer <token>`) were evaluated with `user = null` and resulted in unexpected `403 Forbidden` responses unless `Gate.forUser(user)` was called manually.
+
+In `1.0.10`:
+- **Unified Dual-Guard Resolution**: `Gate.allows()`, `Gate.denies()`, and `Gate.authorize()` automatically resolve the authenticated user from either Session cookies or JWT Bearer tokens.
+- **Route Middlewares on API Routes**: `RoleMiddleware` (`role:admin,editor`) and `CanMiddleware` (`can:ability`) now seamlessly inspect JWT Bearer tokens on API routes.
+- **New `PermissionMiddleware`**: Direct permission route middleware (`permission:publish-post`).
+- **Flexible `HasRoles`**: Safely extracts roles and permissions from `user.role` (string), `user.roles` (array or JSON-encoded database string), and model `attributes`.
+
+#### Recommended Update for Existing Projects: `ApiAuthMiddleware.ts`
+
+If your existing application has `app/Middleware/ApiAuthMiddleware.ts`, update it to attach the resolved user directly to the request context. This ensures downstream authorization middlewares and controllers can reuse the user without re-querying the database:
+
+```typescript
+// app/Middleware/ApiAuthMiddleware.ts
+// After verifying the token payload:
+const user = await Auth.jwt().user(guard);
+if (!user) {
+    reply.status(401).send({ message: "Unauthenticated. User not found." });
+    return;
+}
+
+// Attach to request context
+request.setUser(user);
 ```
 
 ---

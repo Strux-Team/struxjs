@@ -1,6 +1,7 @@
 import { Auth } from "./Auth.js";
 import { AuthorizationError } from "./AuthorizationError.js";
 import { HasRoles } from "./HasRoles.js";
+import { httpContextStorage, decorateRequest } from "../http/HttpContext.js";
 
 export type GateCallback = (user: any, ...args: any[]) => boolean | Promise<boolean>;
 export type BeforeHook = (user: any, ability: string, ...args: any[]) => boolean | undefined | Promise<boolean | undefined>;
@@ -180,7 +181,25 @@ export class Gate {
 
     private static async resolveCurrentUser(): Promise<any> {
         try {
-            return await Auth.user();
+            const store = httpContextStorage.getStore();
+            if (store) {
+                const req = decorateRequest(store.request);
+                const attached = req.user();
+                if (attached) return attached;
+            }
+
+            const user = await Auth.user();
+            if (user) return user;
+
+            if (await Auth.jwt().check()) {
+                const jwtUser = await Auth.jwt().user();
+                if (jwtUser && store) {
+                    decorateRequest(store.request).setUser(jwtUser);
+                }
+                return jwtUser;
+            }
+
+            return null;
         } catch {
             return null;
         }

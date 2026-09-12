@@ -42,7 +42,7 @@ export type { RefreshTokenRecord, RefreshStoreRedisOptions } from "./core/auth/J
 export { Gate, UserGateEvaluator } from "./core/auth/Gate.js";
 export { AuthorizationError } from "./core/auth/AuthorizationError.js";
 export { HasRoles } from "./core/auth/HasRoles.js";
-export { CanMiddleware, RoleMiddleware } from "./core/auth/AuthorizeMiddleware.js";
+export { CanMiddleware, RoleMiddleware, PermissionMiddleware } from "./core/auth/AuthorizeMiddleware.js";
 export { parseTtlToSeconds } from "./core/auth/ttl.js";
 
 // Export Application Lifecycle Core

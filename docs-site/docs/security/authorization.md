@@ -259,20 +259,60 @@ Route.get("/dashboard", [DashboardController, "index"])
     .middleware("role:admin,editor");
 ```
 
-Register `RoleMiddleware` in `AppServiceProvider` to use string aliases:
+### `PermissionMiddleware` - direct permission check
+
+Restrict a route to users with a specific permission:
 
 ```typescript
-import { CanMiddleware, RoleMiddleware } from "struxjs";
+import { PermissionMiddleware } from "struxjs";
+
+Route.post("/posts", [PostController, "store"])
+    .middleware("permission:publish-post");
+```
+
+Register middlewares in `AppServiceProvider` to use string aliases:
+
+```typescript
+import { CanMiddleware, RoleMiddleware, PermissionMiddleware } from "struxjs";
 
 export class AppServiceProvider {
     public register(container: Container): void {
-        container.bind("can",  (c) => c.make(CanMiddleware));
-        container.bind("role", (c) => c.make(RoleMiddleware));
+        container.bind("can",        (c) => c.make(CanMiddleware));
+        container.bind("role",       (c) => c.make(RoleMiddleware));
+        container.bind("permission", (c) => c.make(PermissionMiddleware));
     }
 }
 ```
 
-`CanMiddleware` and `RoleMiddleware` are imported from `struxjs` - they are not placed in `app/Middleware/`, so they are not auto-discovered. You must register them manually as shown above before using the string alias format.
+### Combining Authentication & Authorization in Routes
+
+You can chain authentication middleware (`auth` or `apiauth`) with authorization middleware (`can`, `role`, `permission`) on any route or route group:
+
+```typescript
+// Web Routes (Session auth + Role check)
+Route.middleware(["auth", "role:admin"]).group(() => {
+    Route.get("/admin", [AdminController, "index"]);
+});
+
+// API Routes (JWT Bearer Token + Role check)
+Route.middleware(["apiauth", "role:admin"]).group(() => {
+    Route.get("/api/admin/metrics", [AdminController, "metrics"]);
+});
+
+// API Routes (JWT Bearer Token + Gate ability check)
+Route.middleware(["apiauth", "can:edit-post"])
+    .put("/api/posts/:id", [PostController, "update"]);
+
+// API Routes (JWT Bearer Token + Direct permission check)
+Route.middleware(["apiauth", "permission:manage-users"])
+    .delete("/api/users/:id", [UserController, "destroy"]);
+```
+
+::: tip DUAL-GUARD & CONTEXT SHARING (SESSION & JWT)
+All authorization utilities (`Gate.allows()`, `Gate.authorize()`, `CanMiddleware`, `RoleMiddleware`, and `PermissionMiddleware`) automatically resolve the authenticated user from both **Web Session cookies** and **JWT Bearer tokens** (`Authorization: Bearer <token>`).
+
+When `apiauth` verifies a JWT token, it automatically attaches the user to the request context. Downstream authorization middlewares access this user instance immediately without querying the database again.
+:::
 
 ---
 
@@ -343,4 +383,5 @@ try {
 | `HasRoles.hasPermissionTo(user, perm)` | Check a permission |
 | `CanMiddleware` | Route middleware - ability check |
 | `RoleMiddleware` | Route middleware - role check |
+| `PermissionMiddleware` | Route middleware - direct permission check |
 | `@can` / `@role` | Template directives |

@@ -5,12 +5,48 @@ export interface RolePermissionModel {
 }
 
 export class HasRoles {
+    private static extractRoles(user: any): string[] {
+        if (!user) return [];
+        let raw = user.roles ?? user.role ?? user.attributes?.roles ?? user.attributes?.role;
+        if (typeof raw === "string") {
+            const trimmed = raw.trim();
+            if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+                try {
+                    raw = JSON.parse(trimmed);
+                } catch {
+                    raw = [trimmed];
+                }
+            } else if (trimmed !== "") {
+                raw = [trimmed];
+            }
+        }
+        return Array.isArray(raw) ? raw : [];
+    }
+
+    private static extractPermissions(user: any): string[] {
+        if (!user) return [];
+        let raw = user.permissions ?? user.permission ?? user.attributes?.permissions ?? user.attributes?.permission;
+        if (typeof raw === "string") {
+            const trimmed = raw.trim();
+            if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+                try {
+                    raw = JSON.parse(trimmed);
+                } catch {
+                    raw = [trimmed];
+                }
+            } else if (trimmed !== "") {
+                raw = [trimmed];
+            }
+        }
+        return Array.isArray(raw) ? raw : [];
+    }
+
     /**
      * Check if user model instance has a specific role
      */
     public static hasRole(user: any, role: string): boolean {
         if (!user) return false;
-        const roles: string[] = Array.isArray(user.roles) ? user.roles : [];
+        const roles = this.extractRoles(user);
         return roles.includes(role);
     }
 
@@ -19,7 +55,7 @@ export class HasRoles {
      */
     public static hasAnyRole(user: any, roles: string[]): boolean {
         if (!user) return false;
-        const userRoles: string[] = Array.isArray(user.roles) ? user.roles : [];
+        const userRoles = this.extractRoles(user);
         return roles.some(r => userRoles.includes(r));
     }
 
@@ -28,7 +64,7 @@ export class HasRoles {
      */
     public static hasAllRoles(user: any, roles: string[]): boolean {
         if (!user) return false;
-        const userRoles: string[] = Array.isArray(user.roles) ? user.roles : [];
+        const userRoles = this.extractRoles(user);
         return roles.every(r => userRoles.includes(r));
     }
 
@@ -39,7 +75,7 @@ export class HasRoles {
         if (!user) return false;
 
         // Direct permission check
-        const directPermissions: string[] = Array.isArray(user.permissions) ? user.permissions : [];
+        const directPermissions = this.extractPermissions(user);
         if (directPermissions.includes(permission)) return true;
 
         // Superadmin bypass if configured

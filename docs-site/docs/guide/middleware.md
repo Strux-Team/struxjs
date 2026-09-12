@@ -242,3 +242,39 @@ export class AuthMiddleware implements Middleware {
     }
 }
 ```
+
+---
+
+## Built-in Framework Middlewares
+
+StruxJS includes several ready-to-use middleware components for authentication, authorization, and security:
+
+| Middleware Class | Typical Alias | Description |
+| :--- | :--- | :--- |
+| `AuthMiddleware` | `"auth"` | Web session authentication. Redirects guests to `/login` or returns 401. |
+| `ApiAuthMiddleware` | `"apiauth"` | Stateless JWT Bearer token authentication. Sets `request.user()`. |
+| `CanMiddleware` | `"can"` | Gate ability authorization (e.g. `can:edit-post`). Dual-guard aware. |
+| `RoleMiddleware` | `"role"` | Role-based access control (e.g. `role:admin,editor`). Dual-guard aware. |
+| `PermissionMiddleware` | `"permission"` | Direct permission check (e.g. `permission:publish`). Dual-guard aware. |
+| `VerifyCsrfToken` | `"csrf"` | Verifies CSRF token on POST/PUT/DELETE requests. |
+| `ThrottleRequests` | `"throttle"` | Rate limits requests by IP or client key. |
+
+### Chaining Example: Authenticated API with RBAC
+
+```typescript
+import { Route } from "struxjs";
+
+// Require valid JWT Bearer token AND admin role
+Route.middleware(["apiauth", "role:admin"]).group(() => {
+    Route.get("/api/admin/users", [AdminController, "users"]);
+    Route.get("/api/admin/metrics", [AdminController, "metrics"]);
+});
+
+// Require valid JWT Bearer token AND specific permission
+Route.middleware(["apiauth", "permission:delete-users"])
+    .delete("/api/users/:id", [UserController, "destroy"]);
+
+// Require valid JWT Bearer token AND Gate ability
+Route.middleware(["apiauth", "can:update-post"])
+    .put("/api/posts/:id", [PostController, "update"]);
+```
