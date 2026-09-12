@@ -115,6 +115,48 @@ Route.get("/admin/settings", "AdminController@settings")
     .middleware("role:admin,superadmin");
 ```
 
+In the middleware's `handle` method, these parameters are received after `request` and `response`:
+
+```typescript
+export class CheckRoleMiddleware implements Middleware {
+    public async handle(request: Request, response: Response, ...roles: string[]) {
+        // roles = ["admin", "superadmin"]
+    }
+}
+```
+
+### 5. Instance with Constructor Arguments (Type-Safe & Recommended)
+
+You can pass complex or typed parameters (numbers, objects, enums, callbacks) directly through the constructor:
+
+```typescript
+export class ThrottleMiddleware implements Middleware {
+    constructor(private maxAttempts = 60, private decayMinutes = 1) {}
+
+    public async handle(request: Request, response: Response): Promise<void> {
+        // use this.maxAttempts and this.decayMinutes
+    }
+}
+```
+
+Then pass the instantiated object directly to `.middleware()`:
+
+```typescript
+Route.get("/api/sensitive", [DataController, "show"])
+    .middleware(new ThrottleMiddleware(10, 5));
+```
+
+### 6. Fluent Factory Functions
+
+You can also export fluent helper functions to keep routes clean and expressive:
+
+```typescript
+export const throttle = (max: number, decay: number) => new ThrottleMiddleware(max, decay);
+
+Route.get("/api/sensitive", [DataController, "show"])
+    .middleware(throttle(10, 5));
+```
+
 ---
 
 ## Selective Middleware Exclusion (`.withoutMiddleware`)
