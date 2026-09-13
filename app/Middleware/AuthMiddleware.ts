@@ -12,10 +12,10 @@ import { Middleware, Request, Response, Auth } from "struxjs";
 export class AuthMiddleware implements Middleware {
     constructor(
         private redirectTo: string = "/login",
-        private guard?: string
+        private guard: string = "web"
     ) {}
 
-    public static redirectTo(url: string, guard?: string): AuthMiddleware {
+    public static redirectTo(url: string, guard: string = "web"): AuthMiddleware {
         return new AuthMiddleware(url, guard);
     }
 
