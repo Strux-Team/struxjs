@@ -29,14 +29,6 @@ export class AuthMiddleware implements Middleware {
         const targetGuard = guardParam || this.guard;
 
         if (await Auth.guard(targetGuard).guest()) {
-            const wantsJson = (request as any).headers?.accept?.includes("application/json")
-                || (request as any).url?.startsWith("/api/");
-
-            if (wantsJson) {
-                response.status(401).send({ error: "Unauthenticated." });
-                return;
-            }
-
             response.redirect(targetRedirect);
         }
     }

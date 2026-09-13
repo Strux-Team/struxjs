@@ -117,20 +117,34 @@ If your existing application has `app/Middleware/ApiAuthMiddleware.ts`, update i
 
 ```typescript
 // app/Middleware/ApiAuthMiddleware.ts
+import { Middleware, Request, Response, Auth } from "struxjs";
+
 export class ApiAuthMiddleware implements Middleware {
     constructor(private defaultGuard: string = "api") {}
 
-    public async handle(request: FastifyRequest, reply: FastifyReply, guard?: string): Promise<void> {
+    public static guard(guardName: string): ApiAuthMiddleware {
+        return new ApiAuthMiddleware(guardName);
+    }
+
+    public async handle(request: Request, response: Response, guard?: string): Promise<void> {
         const targetGuard = guard || this.defaultGuard;
-        // Verify token...
-        const user = await Auth.jwt().user(targetGuard);
-        if (!user) {
-            reply.status(401).send({ message: "Unauthenticated. User not found." });
+
+        if (!(await Auth.jwt().check(targetGuard))) {
+            response.status(401).send({ error: "Unauthorized" });
             return;
         }
 
-        // Attach to request context
+        const user = await Auth.jwt().user(targetGuard);
+        if (!user) {
+            response.status(401).send({ error: "Unauthorized" });
+            return;
+        }
+
         request.setUser(user);
+    }
+
+    public toString(): string {
+        return this.defaultGuard !== "api" ? `apiauth:${this.defaultGuard}` : "ApiAuthMiddleware";
     }
 }
 ```
@@ -141,22 +155,34 @@ If your application has `app/Middleware/AuthMiddleware.ts`, update it to support
 
 ```typescript
 // app/Middleware/AuthMiddleware.ts
+import { Middleware, Request, Response, Auth } from "struxjs";
+
 export class AuthMiddleware implements Middleware {
     constructor(
         private redirectTo: string = "/login",
-        private guard?: string
+        private guard: string = "web"
     ) {}
 
-    public async handle(request: Request, response: Response, redirectParam?: string, guardParam?: string): Promise<void> {
+    public static redirectTo(url: string, guard: string = "web"): AuthMiddleware {
+        return new AuthMiddleware(url, guard);
+    }
+
+    public async handle(
+        request: Request,
+        response: Response,
+        redirectParam?: string,
+        guardParam?: string
+    ): Promise<void> {
         const targetRedirect = redirectParam || this.redirectTo;
         const targetGuard = guardParam || this.guard;
 
         if (await Auth.guard(targetGuard).guest()) {
-            if (request.headers.accept?.includes("application/json") || request.url.startsWith("/api/")) {
-                return response.status(401).send({ message: "Unauthenticated." });
-            }
             response.redirect(targetRedirect);
         }
+    }
+
+    public toString(): string {
+        return this.redirectTo !== "/login" ? `auth:${this.redirectTo}` : "AuthMiddleware";
     }
 }
 ```

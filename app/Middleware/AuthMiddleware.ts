@@ -29,19 +29,7 @@ export class AuthMiddleware implements Middleware {
         const targetGuard = guardParam || this.guard;
 
         if (await Auth.guard(targetGuard).guest()) {
-            // API requests → 401 JSON
-            const isApiRoute = request.url.startsWith("/api/") || request.url === "/api";
-            const wantsJson =
-                (request.headers.accept || "").includes("application/json") ||
-                request.headers["x-requested-with"] === "XMLHttpRequest" ||
-                isApiRoute;
-
-            if (wantsJson) {
-                response.status(401).send({ message: "Unauthenticated." });
-            } else {
-                // Web requests → redirect to login page
-                response.redirect(targetRedirect);
-            }
+            response.redirect(targetRedirect);
         }
     }
 
