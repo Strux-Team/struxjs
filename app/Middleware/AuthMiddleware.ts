@@ -1,4 +1,4 @@
-import { Middleware, Request, Response, auth } from "struxjs";
+import { Middleware, Request, Response, Auth } from "struxjs";
 
 /**
  * AuthMiddleware — Web Session authentication middleware.
@@ -28,7 +28,7 @@ export class AuthMiddleware implements Middleware {
         const targetRedirect = redirectParam || this.redirectTo;
         const targetGuard = guardParam || this.guard;
 
-        if (auth(targetGuard).guest()) {
+        if (await Auth.guard(targetGuard).guest()) {
             // API requests → 401 JSON
             const isApiRoute = request.url.startsWith("/api/") || request.url === "/api";
             const wantsJson =

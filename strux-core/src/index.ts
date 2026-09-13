@@ -33,6 +33,7 @@ export { Lang, LangManager, trans, __ } from "./core/lang/LangManager.js";
 
 // Export Auth Core
 export { Auth, auth } from "./core/auth/Auth.js";
+export type { AuthGuard } from "./core/auth/Auth.js";
 export { JwtGuard } from "./core/auth/JwtGuard.js";
 export type { JwtPayload, JwtConfig } from "./core/auth/JwtGuard.js";
 export { JwtBlacklist, jwtBlacklist } from "./core/auth/JwtBlacklist.js";

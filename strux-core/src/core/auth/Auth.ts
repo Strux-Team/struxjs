@@ -17,6 +17,16 @@ import { JwtGuard, JwtConfig } from "./JwtGuard.js";
 // Per-guard model registry: Auth.extend('admin', AdminUser)
 const guardRegistry: Map<string, new (attrs?: Record<string, any>) => BaseModel> = new Map();
 
+export interface AuthGuard {
+    check(): Promise<boolean>;
+    guest(): Promise<boolean>;
+    user<T extends BaseModel = BaseModel>(): Promise<T | null>;
+    id(): Promise<any>;
+    login(user: BaseModel): Promise<void>;
+    logout(): Promise<void>;
+    attempt(credentials: Record<string, any>): Promise<boolean>;
+}
+
 export class Auth {
     /* ---------------------------------------------------------------------- */
     /*  Guard model registration                                               */
@@ -70,6 +80,51 @@ export class Auth {
         return JwtGuard;
     }
 
+    /**
+     * Access a named guard instance (e.g. Auth.guard('web'), Auth.guard('admin'), Auth.guard('api')).
+     *
+     * if (await Auth.guard('admin').check()) { ... }
+     * if (await Auth.guard('web').guest()) { ... }
+     * const user = await Auth.guard('admin').user<AdminUser>();
+     */
+    public static guard(name: string = "web"): AuthGuard {
+        return {
+            check: async (): Promise<boolean> => {
+                if (name === "api") {
+                    return await this.jwt().check(name);
+                }
+                const user = await this.user(name);
+                return user !== null;
+            },
+            guest: async (): Promise<boolean> => {
+                if (name === "api") {
+                    return !(await this.jwt().check(name));
+                }
+                const user = await this.user(name);
+                return user === null;
+            },
+            user: <T extends BaseModel = BaseModel>(): Promise<T | null> => {
+                return this.user<T>(name);
+            },
+            id: async (): Promise<any> => {
+                if (name === "api") {
+                    return await this.jwt().id(name);
+                }
+                const u = await this.user(name);
+                return u ? ((u as any).attributes?.id ?? (u as any).id ?? null) : null;
+            },
+            login: (user: BaseModel): Promise<void> => {
+                return this.login(user, name);
+            },
+            logout: (): Promise<void> => {
+                return this.logout();
+            },
+            attempt: (credentials: Record<string, any>): Promise<boolean> => {
+                return this.attempt(credentials, name);
+            }
+        };
+    }
+
     /* ---------------------------------------------------------------------- */
     /*  Private session helpers                                                */
     /* ---------------------------------------------------------------------- */
@@ -121,17 +176,25 @@ export class Auth {
      * Check whether a user is currently authenticated (via Session or JWT).
      *
      * if (Auth.check()) { ... }
+     * if (Auth.check('admin')) { ... }
      */
-    public static check(): boolean {
+    public static check(guard?: string): boolean {
         try {
             const store = httpContextStorage.getStore();
             if (store) {
                 const req = decorateRequest(store.request);
-                if (req.user() !== null) return true;
+                if (req.user() !== null) {
+                    if (!guard) return true;
+                }
             }
             const session = this.getSession();
             const id = session.get("_auth_id");
-            return id !== undefined && id !== null;
+            if (id === undefined || id === null) return false;
+            if (guard) {
+                const sessionGuard = session.get("_auth_guard") ?? "web";
+                return sessionGuard === guard;
+            }
+            return true;
         } catch {
             return false;
         }
@@ -141,9 +204,10 @@ export class Auth {
      * Check whether the request is unauthenticated (inverse of check()).
      *
      * if (Auth.guest()) { return redirect('/login'); }
+     * if (Auth.guest('admin')) { return redirect('/admin/login'); }
      */
-    public static guest(): boolean {
-        return !this.check();
+    public static guest(guard?: string): boolean {
+        return !this.check(guard);
     }
 
     /**
@@ -302,17 +366,23 @@ export class Auth {
 }
 
 /**
- * Global auth() helper — returns the Auth facade.
+ * Global auth() helper — returns the Auth facade or a scoped guard instance.
  * Mirrors Laravel's auth() helper for use anywhere inside the request lifecycle.
  *
  * Usage (inside Controllers, Middleware, Services):
  *   import { auth } from "struxjs";
  *
  *   if (auth().check()) { ... }
+ *   if (await auth("admin").check()) { ... }
  *   const user = await auth().user<User>();
  *   const id   = auth().id();
  *   await auth().logout();
  */
-export function auth(): typeof Auth {
+export function auth(): typeof Auth;
+export function auth(guard: string): AuthGuard;
+export function auth(guard?: string): typeof Auth | AuthGuard {
+    if (guard) {
+        return Auth.guard(guard);
+    }
     return Auth;
 }

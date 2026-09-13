@@ -210,4 +210,42 @@ describe("Auth & JWT Guard", () => {
         // Turn rotation back off
         Auth.configureJwt({ rotation: false });
     });
+
+    test("Auth.guard() returns scoped guard instance with check and guest", async () => {
+        const { httpContextStorage } = await import("../src/core/http/HttpContext.js");
+        const user = new UserMock();
+        const pair = await JwtGuard.issueTokenPair(user, "api");
+
+        // When unauthenticated in HTTP context
+        await httpContextStorage.run(
+            {
+                request: { headers: {} } as any,
+                reply: {} as any,
+                session: { get: () => null } as any,
+                userCache: new Map(),
+            },
+            async () => {
+                expect(await Auth.guard("web").guest()).toBe(true);
+                expect(await Auth.guard("web").check()).toBe(false);
+                expect(await Auth.guard("api").guest()).toBe(true);
+                expect(await Auth.guard("api").check()).toBe(false);
+            }
+        );
+
+        // When authenticated with JWT Bearer in HTTP context
+        await httpContextStorage.run(
+            {
+                request: { headers: { authorization: `Bearer ${pair.token}` } } as any,
+                reply: {} as any,
+                session: { get: () => null } as any,
+                userCache: new Map(),
+            },
+            async () => {
+                expect(await Auth.guard("api").check()).toBe(true);
+                expect(await Auth.guard("api").guest()).toBe(false);
+                const resolvedUser = await Auth.guard("api").user();
+                expect(resolvedUser?.id).toBe(42);
+            }
+        );
+    });
 });
