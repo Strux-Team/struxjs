@@ -105,22 +105,57 @@ In `1.0.10`:
 - **Route Middlewares on API Routes**: `RoleMiddleware` (`role:admin,editor`) and `CanMiddleware` (`can:ability`) now seamlessly inspect JWT Bearer tokens on API routes.
 - **New `PermissionMiddleware`**: Direct permission route middleware (`permission:publish-post`).
 - **Flexible `HasRoles`**: Safely extracts roles and permissions from `user.role` (string), `user.roles` (array or JSON-encoded database string), and model `attributes`.
+- **Middleware Constructor Arguments & Fluent Helpers**: All security middlewares (`CanMiddleware`, `RoleMiddleware`, `PermissionMiddleware`, `AuthMiddleware`, `ApiAuthMiddleware`) can now be passed as instantiated objects (`new CanMiddleware('edit-post')`) or via convenient fluent helpers (`can('edit-post')`, `role('admin')`, `permission('publish')`, `apiAuth('admin')`) without requiring container binding.
+- **ORM Model `id` Accessor Fix**: Resolved an issue where model instances queried from the database had `id` evaluate to `undefined` due to ES2022 class field initialization. `BaseModel` now uses an ambient `declare id: any` declaration and Proxy-prioritized resolution for `id`, `_id`, and table primary keys.
 
 #### Recommended Update for Existing Projects: `ApiAuthMiddleware.ts`
 
-If your existing application has `app/Middleware/ApiAuthMiddleware.ts`, update it to attach the resolved user directly to the request context. This ensures downstream authorization middlewares and controllers can reuse the user without re-querying the database:
+If your existing application has `app/Middleware/ApiAuthMiddleware.ts`, update it to support constructor guard arguments and attach the resolved user directly to the request context:
 
 ```typescript
 // app/Middleware/ApiAuthMiddleware.ts
-// After verifying the token payload:
-const user = await Auth.jwt().user(guard);
-if (!user) {
-    reply.status(401).send({ message: "Unauthenticated. User not found." });
-    return;
-}
+export class ApiAuthMiddleware implements Middleware {
+    constructor(private defaultGuard: string = "api") {}
 
-// Attach to request context
-request.setUser(user);
+    public async handle(request: FastifyRequest, reply: FastifyReply, guard?: string): Promise<void> {
+        const targetGuard = guard || this.defaultGuard;
+        // Verify token...
+        const user = await Auth.jwt().user(targetGuard);
+        if (!user) {
+            reply.status(401).send({ message: "Unauthenticated. User not found." });
+            return;
+        }
+
+        // Attach to request context
+        request.setUser(user);
+    }
+}
+```
+
+#### Recommended Update for Existing Projects: `AuthMiddleware.ts`
+
+If your application has `app/Middleware/AuthMiddleware.ts`, update it to support custom redirect paths and guard parameters:
+
+```typescript
+// app/Middleware/AuthMiddleware.ts
+export class AuthMiddleware implements Middleware {
+    constructor(
+        private redirectTo: string = "/login",
+        private guard?: string
+    ) {}
+
+    public async handle(request: Request, response: Response, redirectParam?: string, guardParam?: string): Promise<void> {
+        const targetRedirect = redirectParam || this.redirectTo;
+        const targetGuard = guardParam || this.guard;
+
+        if (await Auth.guard(targetGuard).guest()) {
+            if (request.headers.accept?.includes("application/json") || request.url.startsWith("/api/")) {
+                return response.status(401).send({ message: "Unauthenticated." });
+            }
+            response.redirect(targetRedirect);
+        }
+    }
+}
 ```
 
 ---

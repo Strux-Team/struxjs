@@ -289,34 +289,39 @@ export class AuthMiddleware implements Middleware {
 
 ## Built-in Framework Middlewares
 
-StruxJS includes several ready-to-use middleware components for authentication, authorization, and security:
+StruxJS includes several ready-to-use middleware components for authentication, authorization, and security. All parameterized middlewares support both **Instance Constructors** (with type-safe options) and **String Aliases** (colon syntax):
 
-| Middleware Class | Typical Alias | Description |
-| :--- | :--- | :--- |
-| `AuthMiddleware` | `"auth"` | Web session authentication. Redirects guests to `/login` or returns 401. |
-| `ApiAuthMiddleware` | `"apiauth"` | Stateless JWT Bearer token authentication. Sets `request.user()`. |
-| `CanMiddleware` | `"can"` | Gate ability authorization (e.g. `can:edit-post`). Dual-guard aware. |
-| `RoleMiddleware` | `"role"` | Role-based access control (e.g. `role:admin,editor`). Dual-guard aware. |
-| `PermissionMiddleware` | `"permission"` | Direct permission check (e.g. `permission:publish`). Dual-guard aware. |
-| `VerifyCsrfToken` | `"csrf"` | Verifies CSRF token on POST/PUT/DELETE requests. |
-| `ThrottleRequests` | `"throttle"` | Rate limits requests by IP or client key. |
+| Middleware Class | Typical Alias | Parameters | Instance Usage | String Alias Usage |
+| :--- | :--- | :--- | :--- | :--- |
+| `AuthMiddleware` | `"auth"` | `redirectTo?`, `guard?` | `new AuthMiddleware("/admin/login", "admin")` | `"auth:/admin/login,admin"` |
+| `ApiAuthMiddleware` | `"apiauth"` | `guard?` | `new ApiAuthMiddleware("admin")` or `apiAuth("admin")` | `"apiauth:admin"` |
+| `CanMiddleware` | `"can"` | `ability` | `new CanMiddleware("edit-post")` or `can("edit-post")` | `"can:edit-post"` |
+| `RoleMiddleware` | `"role"` | `...roles` | `new RoleMiddleware("admin", "editor")` or `role("admin", "editor")` | `"role:admin,editor"` |
+| `PermissionMiddleware` | `"permission"` | `...permissions` | `new PermissionMiddleware("publish-post")` or `permission("publish-post")` | `"permission:publish-post"` |
+| `VerifyCsrfToken` | `"csrf"` | *(none)* | `VerifyCsrfToken` | `"csrf"` |
+| `RouteCacheMiddleware` | `"cache"` | `durationSeconds?` | `new RouteCacheMiddleware(300)` | `"cache:300"` |
+
+For comprehensive guides on these security middlewares, see:
+- [Authentication Documentation (AuthMiddleware & ApiAuthMiddleware)](../security/auth.md)
+- [Authorization Documentation (CanMiddleware, RoleMiddleware, PermissionMiddleware)](../security/authorization.md)
 
 ### Chaining Example: Authenticated API with RBAC
 
 ```typescript
-import { Route } from "struxjs";
+import { Route, can, role, permission } from "struxjs";
+import { ApiAuthMiddleware, apiAuth } from "../app/Middleware/ApiAuthMiddleware.js";
 
-// Require valid JWT Bearer token AND admin role
-Route.middleware(["apiauth", "role:admin"]).group(() => {
+// Option A: Fluent helpers (clean & type-safe)
+Route.middleware([apiAuth(), role("admin")]).group(() => {
     Route.get("/api/admin/users", [AdminController, "users"]);
     Route.get("/api/admin/metrics", [AdminController, "metrics"]);
 });
 
-// Require valid JWT Bearer token AND specific permission
+// Option B: String aliases
 Route.middleware(["apiauth", "permission:delete-users"])
     .delete("/api/users/:id", [UserController, "destroy"]);
 
-// Require valid JWT Bearer token AND Gate ability
-Route.middleware(["apiauth", "can:update-post"])
+// Option C: Instance constructor
+Route.middleware(["apiauth", can("update-post")])
     .put("/api/posts/:id", [PostController, "update"]);
 ```

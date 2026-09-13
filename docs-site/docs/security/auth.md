@@ -297,7 +297,11 @@ Pass a guard name to enforce that the token was issued for a specific guard. A t
 Route.get("/admin/stats", [AdminController, "stats"])
     .middleware(new ApiAuthMiddleware("admin"));
 
-// Option 2: Using String Alias
+// Option 2: Using Fluent Helper function
+Route.get("/admin/stats", [AdminController, "stats"])
+    .middleware(apiAuth("admin"));
+
+// Option 3: Using String Alias
 Route.get("/admin/stats", [AdminController, "stats"])
     .middleware("apiauth:admin");
 ```
