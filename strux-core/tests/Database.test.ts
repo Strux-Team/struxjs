@@ -53,14 +53,20 @@ describe("Active Record ORM & Query Builder", () => {
         });
 
         expect(user.id).toBeDefined();
+        expect(user.name).toBe("John Active");
         expect(user.attributes.name).toBe("John Active");
 
         const found = await User.find<User>(user.id);
         expect(found).not.toBeNull();
+        expect(found!.id).toBe(user.id);
+        expect(found!.name).toBe("John Active");
+        expect(found!.email).toBe("john@orm.com");
         expect(found!.attributes.email).toBe("john@orm.com");
 
         await found!.update({ name: "John Updated" });
         const updated = await User.find<User>(user.id);
+        expect(updated!.id).toBe(user.id);
+        expect(updated!.name).toBe("John Updated");
         expect(updated!.attributes.name).toBe("John Updated");
 
         await updated!.delete();
@@ -151,5 +157,40 @@ describe("Active Record ORM & Query Builder", () => {
 
         const deleted = await DB.delete("DELETE FROM users WHERE email = ?", ["insert@test.com"]);
         expect(deleted).toBeGreaterThan(0);
+    });
+
+    test("model instance correctly resolves id and toArray contains id", async () => {
+        const created = await User.create<User>({ name: "ID Test", email: "id@test.com" });
+        expect(created.id).toBeDefined();
+
+        // 1. find()
+        const found = await User.find<User>(created.id);
+        expect(found!.id).toBe(created.id);
+        expect(found!.toArray().id).toBe(created.id);
+        expect("id" in found!).toBe(true);
+
+        // 2. where().first()
+        const queried = await User.where("email", "id@test.com").first<User>();
+        expect(queried!.id).toBe(created.id);
+        expect(queried!.toArray().id).toBe(created.id);
+
+        // 3. Subclass with declared or class fields
+        class TypedUser extends BaseModel {
+            public table = "users";
+            id!: number;
+            name!: string;
+        }
+        const typedInstance = new TypedUser({ id: 999, name: "Typed" });
+        expect(typedInstance.id).toBe(999);
+        expect(typedInstance.name).toBe("Typed");
+
+        // 4. MongoDB _id mapping to id
+        class MongoModel extends BaseModel {
+            public table = "docs";
+        }
+        const mongoInstance = new MongoModel({ _id: "64b0f1a2c3d4e5f6a7b8c9d0", title: "Doc" });
+        expect(mongoInstance.id).toBe("64b0f1a2c3d4e5f6a7b8c9d0");
+        expect(mongoInstance._id).toBe("64b0f1a2c3d4e5f6a7b8c9d0");
+        expect(mongoInstance.toArray().id).toBe("64b0f1a2c3d4e5f6a7b8c9d0");
     });
 });

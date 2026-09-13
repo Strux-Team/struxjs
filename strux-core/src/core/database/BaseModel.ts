@@ -133,8 +133,8 @@ export abstract class BaseModel {
         }
     }
 
-    // Primary Key accessor property type declaration for TypeScript
-    public id?: any;
+    // Primary Key accessor property type declaration for TypeScript (ambient, does not emit instance field)
+    declare id: any;
 
     // Allow dynamic attribute & relationship property access in TypeScript (e.g. user.name, user.posts)
     [key: string]: any;
@@ -162,22 +162,25 @@ export abstract class BaseModel {
 
         // Proxy allows dynamic property access:
         // 1. Checks loaded relationship models (e.g. user.posts)
-        // 2. Checks explicit class methods/fields
-        // 3. Casts & returns column attributes (e.g. user.is_active, user.settings)
+        // 2. Checks explicit class methods/functions (including relation query builders)
+        // 3. Checks model configuration metadata (table, primaryKey, casts, etc.)
+        // 4. Checks custom prototype getters (e.g. get fullName())
+        // 5. Resolves primary key 'id' from attributes.id, attributes._id, or attributes[primaryKey]
+        // 6. Casts & returns column attributes (e.g. user.is_active, user.settings)
         return new Proxy(this, {
-            get(target: any, prop: string | symbol) {
+            get(target: any, prop: string | symbol, receiver: any) {
                 if (typeof prop === "string") {
                     // 1. Check loaded relationship cache
                     if (prop in target.relations) {
                         return target.relations[prop];
                     }
 
-                    // 2. Check explicit class methods/fields
-                    if (prop in target) {
+                    // 2. Check explicit class methods/functions
+                    if (typeof target[prop] === "function") {
                         const val = target[prop];
-                        if (typeof val === "function" && !BASE_MODEL_RESERVED_KEYS.has(prop)) {
+                        if (!BASE_MODEL_RESERVED_KEYS.has(prop)) {
                             try {
-                                const rel = val.call(target);
+                                const rel = val.call(receiver || target);
                                 if (rel && rel instanceof Relation) {
                                     // Create callable thenable function proxy
                                     const fn = function (...args: any[]) {
@@ -201,33 +204,109 @@ export abstract class BaseModel {
                                     });
                                 }
                             } catch {
-                                // Regular method — return unchanged
+                                // Regular method — fall through to bind
                             }
                         }
-                        return val;
+                        return val.bind(receiver || target);
                     }
 
-                    // 3. Id mapping for MongoDB _id -> id
-                    if (prop === "id" && !target.attributes.id && target.attributes._id) {
+                    // 3. Check model configuration metadata properties
+                    if (MODEL_CONFIG_KEYS.has(prop)) {
+                        return target[prop];
+                    }
+
+                    // 4. Check prototype custom getters (e.g. get fullName())
+                    let proto = Object.getPrototypeOf(target);
+                    while (proto && proto !== Object.prototype && proto !== BaseModel.prototype) {
+                        const desc = Object.getOwnPropertyDescriptor(proto, prop);
+                        if (desc && desc.get) {
+                            return desc.get.call(receiver || target);
+                        }
+                        proto = Object.getPrototypeOf(proto);
+                    }
+
+                    // 5. Primary Key accessor (id -> attributes.id, attributes._id, or attributes[primaryKey])
+                    if (prop === "id") {
+                        const idVal = target.attributes.id !== undefined
+                            ? target.attributes.id
+                            : (target.attributes._id !== undefined
+                                ? (typeof target.attributes._id === "object" && target.attributes._id?._bsontype ? String(target.attributes._id) : String(target.attributes._id))
+                                : target.attributes[target.primaryKey]);
+
+                        if (idVal !== undefined && idVal !== null) {
+                            return (target.casts && "id" in target.casts)
+                                ? target.castAttribute("id", idVal)
+                                : idVal;
+                        }
+                    }
+
+                    // 6. Attribute casting and database column retrieval
+                    if (prop in target.attributes) {
+                        const rawVal = target.attributes[prop];
+                        if (rawVal !== undefined && rawVal !== null && target.casts && prop in target.casts) {
+                            return target.castAttribute(prop, rawVal);
+                        }
+                        return rawVal;
+                    }
+
+                    // 7. Check if explicit field is set on target (and is not undefined)
+                    if (prop in target && target[prop] !== undefined) {
+                        return target[prop];
+                    }
+
+                    // 8. Id mapping fallback for MongoDB _id -> id if attributes._id exists
+                    if (prop === "id" && target.attributes._id) {
                         return String(target.attributes._id);
                     }
 
-                    // 4. Attribute casting
-                    const rawVal = target.attributes[prop];
-                    if (rawVal !== undefined && rawVal !== null && target.casts && prop in target.casts) {
-                        return target.castAttribute(prop, rawVal);
-                    }
-                    return rawVal;
+                    return undefined;
                 }
                 return (target as any)[prop];
             },
-            set(target: any, prop: string, value: any) {
-                if (prop in target || MODEL_CONFIG_KEYS.has(prop)) {
-                    target[prop] = value;
-                } else {
+            set(target: any, prop: string | symbol, value: any, receiver: any) {
+                if (typeof prop === "string") {
+                    // 1. Prototype Custom Setter
+                    let proto = Object.getPrototypeOf(target);
+                    while (proto && proto !== Object.prototype && proto !== BaseModel.prototype) {
+                        const desc = Object.getOwnPropertyDescriptor(proto, prop);
+                        if (desc && desc.set) {
+                            desc.set.call(receiver || target, value);
+                            return true;
+                        }
+                        proto = Object.getPrototypeOf(proto);
+                    }
+
+                    // 2. Model configuration metadata (table, primaryKey, casts, etc.)
+                    if (MODEL_CONFIG_KEYS.has(prop)) {
+                        target[prop] = value;
+                        return true;
+                    }
+
+                    // 3. Primary Key "id"
+                    if (prop === "id") {
+                        target.attributes.id = value;
+                        if (target.primaryKey && target.primaryKey !== "id") {
+                            target.attributes[target.primaryKey] = value;
+                        }
+                        return true;
+                    }
+
+                    // 4. Default: all data fields go into target.attributes
                     target.attributes[prop] = value;
+                    return true;
                 }
+
+                (target as any)[prop] = value;
                 return true;
+            },
+            has(target: any, prop: string | symbol) {
+                if (typeof prop === "string") {
+                    if (prop === "id") {
+                        return "id" in target.attributes || "_id" in target.attributes || (target.primaryKey && target.primaryKey in target.attributes);
+                    }
+                    return prop in target.attributes || prop in target.relations || prop in target;
+                }
+                return prop in target;
             }
         });
     }
@@ -1236,6 +1315,14 @@ export abstract class BaseModel {
         Object.keys(this.attributes).forEach(key => {
             result[key] = (this as any)[key];
         });
+
+        // Ensure "id" is present if _id or primaryKey exists and id is not already in result
+        if (!("id" in result) && (this.attributes.id !== undefined || this.attributes._id !== undefined || (this.primaryKey && this.attributes[this.primaryKey] !== undefined))) {
+            const idVal = (this as any).id;
+            if (idVal !== undefined) {
+                result.id = idVal;
+            }
+        }
 
         // Append loaded relations into plain object
         Object.keys(this.relations).forEach(key => {
