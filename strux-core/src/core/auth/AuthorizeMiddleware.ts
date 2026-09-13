@@ -38,7 +38,7 @@ async function resolveRequestUser(request: FastifyRequest): Promise<any> {
  *   Route.middleware(can('edit-post')).get('/posts/:id/edit', 'PostController@edit');
  */
 export class CanMiddleware implements Middleware {
-    constructor(private ability?: string) {}
+    constructor(private ability: string = "") {}
 
     public static ability(name: string): CanMiddleware {
         return new CanMiddleware(name);

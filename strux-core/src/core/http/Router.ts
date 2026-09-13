@@ -542,7 +542,7 @@ export class Router {
                 paramNames = rawParamsStr.split(",").map((param: string) => {
                     const parts = param.split(":");
                     const rawVarName = parts[0];
-                    return rawVarName.replace(/[\r\n\t\s]/g, "");
+                    return rawVarName.replace(/[\r\n\t\s]/g, "").split("=")[0];
                 });
             }
         }

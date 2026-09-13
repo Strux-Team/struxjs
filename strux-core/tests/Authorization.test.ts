@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach } from "vitest";
-import { Gate, AuthorizationError, HasRoles, TemplateEngine, Auth, JwtGuard, BaseModel, Schema, CanMiddleware, RoleMiddleware, PermissionMiddleware, can, role, permission } from "../src/index.js";
+import { Container, Gate, AuthorizationError, HasRoles, TemplateEngine, Auth, JwtGuard, BaseModel, Schema, CanMiddleware, RoleMiddleware, PermissionMiddleware, can, role, permission } from "../src/index.js";
 import { httpContextStorage } from "../src/core/http/HttpContext.js";
 
 // Mock User Model
@@ -535,6 +535,18 @@ describe("Authorization and RBAC System", () => {
                     expect(permStatus).toBe(200);
                 }
             );
+        });
+
+        test("CanMiddleware, RoleMiddleware, and PermissionMiddleware resolve successfully via container.make() when passed as Class references", () => {
+            const container = new Container();
+            const canMw = container.make(CanMiddleware);
+            expect(canMw).toBeInstanceOf(CanMiddleware);
+
+            const roleMw = container.make(RoleMiddleware);
+            expect(roleMw).toBeInstanceOf(RoleMiddleware);
+
+            const permMw = container.make(PermissionMiddleware);
+            expect(permMw).toBeInstanceOf(PermissionMiddleware);
         });
     });
 });

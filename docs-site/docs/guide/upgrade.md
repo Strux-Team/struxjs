@@ -24,7 +24,7 @@ StruxJS projects created via `create-strux-app` alias `struxjs-core` to `struxjs
 
 ```json
 "dependencies": {
-  "struxjs": "npm:struxjs-core@^1.0.10"
+  "struxjs": "npm:struxjs-core@^1.0.12"
 }
 ```
 
@@ -63,7 +63,7 @@ Alternatively, you can manually update the version number in your `package.json`
 ```json
 {
   "dependencies": {
-    "struxjs": "npm:struxjs-core@^1.0.10"
+    "struxjs": "npm:struxjs-core@^1.0.12"
   }
 }
 ```
@@ -91,6 +91,15 @@ npm test
 # Start in development mode
 npm run dev
 ```
+
+---
+
+## Upgrading to v1.0.12 (from v1.0.11)
+
+### Highlights
+
+- **Zero Breaking Changes**: Fully backward compatible with `1.0.11`.
+- **IoC Container Resolution for Default, Optional & Rest Parameters**: Resolved an issue where registering or resolving classes with default arguments (such as `Route.middleware(ApiAuthMiddleware)` or `Route.middleware(AuthMiddleware)`) threw `[StruxJS IoC Error]: Auto-injection failed for parameter 'defaultGuard="api"'`. The IoC container now properly detects parameters with default values (`= defaultValue`), optional modifiers (`?`), and rest parameters (`...args`), applying default parameter values automatically when no explicit container binding exists.
 
 ---
 

@@ -268,6 +268,31 @@ describe("HTTP Routing & Dispatching", () => {
         expect(res.payload).toBe("Sample Controller Show (middlewareRan=true)");
     });
 
+    test("supports registering middleware as an unbound Class reference with default constructor parameters", async () => {
+        let guardUsed = "";
+
+        class ApiAuthMiddlewareTest {
+            constructor(public defaultGuard: string = "api") {}
+            public handle(req: any) {
+                guardUsed = this.defaultGuard;
+                req.raw.guardUsed = this.defaultGuard;
+            }
+        }
+
+        Route.get("/api-profile-test", async (req: any) => {
+            return { ok: true, guard: req.raw.guardUsed };
+        }).middleware(ApiAuthMiddlewareTest);
+
+        const res = await router.getEngine().inject({
+            method: "GET",
+            url: "/api-profile-test"
+        });
+
+        expect(res.statusCode).toBe(200);
+        expect(guardUsed).toBe("api");
+        expect(JSON.parse(res.payload)).toEqual({ ok: true, guard: "api" });
+    });
+
     test("supports excluding auto-loaded middlewares via .withoutMiddleware()", async () => {
         const { VerifyCsrfToken, StartSession } = await import("../src/index.js");
 

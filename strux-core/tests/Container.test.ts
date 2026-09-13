@@ -18,6 +18,35 @@ class AppConfig {
     public appName!: string;
 }
 
+class MockApiAuthMiddleware {
+    constructor(public defaultGuard: string = "api") {}
+}
+
+class MockAuthMiddleware {
+    constructor(
+        public redirectTo: string = "/login",
+        public guard: string = "web"
+    ) {}
+}
+
+class MockRoleMiddleware {
+    public roles: string[];
+    constructor(...roles: (string | string[])[]) {
+        this.roles = roles.flat() as string[];
+    }
+}
+
+class ServiceWithDefaults {
+    constructor(
+        public db: MockDatabaseService,
+        public defaultLimit: number = 25
+    ) {}
+}
+
+class UnregisteredServiceConsumer {
+    constructor(public unknownService: any) {}
+}
+
 describe("IoC Container", () => {
     let container: Container;
 
@@ -92,5 +121,37 @@ describe("IoC Container", () => {
         container.clearPlanCache();
         const repo3 = container.resolve<UserRepository>(UserRepository);
         expect(repo3).toBeInstanceOf(UserRepository);
+    });
+
+    test("resolves class with default constructor parameters without auto-injection error", () => {
+        const mw = container.make(MockApiAuthMiddleware);
+        expect(mw).toBeInstanceOf(MockApiAuthMiddleware);
+        expect(mw.defaultGuard).toBe("api");
+
+        const auth = container.make(MockAuthMiddleware);
+        expect(auth).toBeInstanceOf(MockAuthMiddleware);
+        expect(auth.redirectTo).toBe("/login");
+        expect(auth.guard).toBe("web");
+    });
+
+    test("resolves class with rest constructor parameters without error", () => {
+        const roleMw = container.make(MockRoleMiddleware);
+        expect(roleMw).toBeInstanceOf(MockRoleMiddleware);
+        expect(roleMw.roles).toEqual([]);
+    });
+
+    test("resolves class with mixed required service and default arguments", () => {
+        container.bind(MockDatabaseService, () => new MockDatabaseService());
+
+        const service = container.make(ServiceWithDefaults);
+        expect(service).toBeInstanceOf(ServiceWithDefaults);
+        expect(service.db.name).toBe("SQLite");
+        expect(service.defaultLimit).toBe(25);
+    });
+
+    test("throws descriptive error for required unregistered dependencies", () => {
+        expect(() => container.make(UnregisteredServiceConsumer)).toThrow(
+            "[StruxJS IoC Error]: Auto-injection failed for parameter 'unknownService'"
+        );
     });
 });
