@@ -1,6 +1,6 @@
 {
   "name": "create-struxjs-app",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "description": "Scaffolding CLI tool for generating a new StruxJS framework application.",
   "type": "module",
   "bin": {
