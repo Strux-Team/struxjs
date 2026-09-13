@@ -293,8 +293,8 @@ StruxJS includes several ready-to-use middleware components for authentication, 
 
 | Middleware Class | Typical Alias | Parameters | Instance Usage | String Alias Usage |
 | :--- | :--- | :--- | :--- | :--- |
-| `AuthMiddleware` | `"auth"` | `redirectTo?`, `guard?` | `new AuthMiddleware("/admin/login", "admin")` | `"auth:/admin/login,admin"` |
-| `ApiAuthMiddleware` | `"apiauth"` | `guard?` | `new ApiAuthMiddleware("admin")` or `apiAuth("admin")` | `"apiauth:admin"` |
+| `AuthMiddleware` | `"auth"` | `redirectTo?`, `guard?` | `new AuthMiddleware("/admin/login", "admin")` or `AuthMiddleware.redirectTo("/admin/login")` | `"auth:/admin/login,admin"` |
+| `ApiAuthMiddleware` | `"apiauth"` | `guard?` | `new ApiAuthMiddleware("admin")` or `ApiAuthMiddleware.guard("admin")` | `"apiauth:admin"` |
 | `CanMiddleware` | `"can"` | `ability` | `new CanMiddleware("edit-post")` or `can("edit-post")` | `"can:edit-post"` |
 | `RoleMiddleware` | `"role"` | `...roles` | `new RoleMiddleware("admin", "editor")` or `role("admin", "editor")` | `"role:admin,editor"` |
 | `PermissionMiddleware` | `"permission"` | `...permissions` | `new PermissionMiddleware("publish-post")` or `permission("publish-post")` | `"permission:publish-post"` |
@@ -309,10 +309,10 @@ For comprehensive guides on these security middlewares, see:
 
 ```typescript
 import { Route, can, role, permission } from "struxjs";
-import { ApiAuthMiddleware, apiAuth } from "../app/Middleware/ApiAuthMiddleware.js";
+import { ApiAuthMiddleware } from "../app/Middleware/ApiAuthMiddleware.js";
 
-// Option A: Fluent helpers (clean & type-safe)
-Route.middleware([apiAuth(), role("admin")]).group(() => {
+// Option A: Class reference or static factory
+Route.middleware([ApiAuthMiddleware, role("admin")]).group(() => {
     Route.get("/api/admin/users", [AdminController, "users"]);
     Route.get("/api/admin/metrics", [AdminController, "metrics"]);
 });

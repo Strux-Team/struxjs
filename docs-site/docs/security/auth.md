@@ -97,7 +97,7 @@ export class AuthController {
 ```typescript
 import { Auth, auth } from "struxjs";
 
-// Check if authenticated
+// Check if authenticated (default 'web' guard)
 Auth.check()   // true / false
 auth().check() // same, using the global helper
 
@@ -109,6 +109,11 @@ const id = Auth.id();
 
 // Get the full user model (queries DB, cached per request)
 const user = await Auth.user<User>();
+
+// Multi-guard authentication
+Auth.guard("web").check();
+Auth.guard("admin").guest();
+const admin = await Auth.guard("admin").user<Admin>();
 ```
 
 The `auth()` global helper is an alias for `Auth` - use whichever feels more natural.
@@ -129,10 +134,7 @@ When returning a view from a controller, the currently authenticated user object
 
 ### Protecting routes with `AuthMiddleware`
 
-The pre-built `AuthMiddleware` is already in `app/Middleware/AuthMiddleware.ts`. It checks `auth().guest()` and:
-
-- Redirects to `/login` for web requests
-- Returns `401 JSON` for requests that expect JSON (`Accept: application/json`, XHR, or `/api/` routes)
+The pre-built `AuthMiddleware` is already in `app/Middleware/AuthMiddleware.ts`. It verifies session authentication (`Auth.guard(guard).guest()`) and redirects unauthenticated users to `/login` (or a custom configured URL).
 
 Apply it to your protected routes:
 
@@ -297,9 +299,9 @@ Pass a guard name to enforce that the token was issued for a specific guard. A t
 Route.get("/admin/stats", [AdminController, "stats"])
     .middleware(new ApiAuthMiddleware("admin"));
 
-// Option 2: Using Fluent Helper function
+// Option 2: Using Static Guard Factory
 Route.get("/admin/stats", [AdminController, "stats"])
-    .middleware(apiAuth("admin"));
+    .middleware(ApiAuthMiddleware.guard("admin"));
 
 // Option 3: Using String Alias
 Route.get("/admin/stats", [AdminController, "stats"])
@@ -405,7 +407,7 @@ Auth.configureJwt({
 
 | Middleware | Alias | Purpose |
 | :--- | :--- | :--- |
-| `AuthMiddleware` | `"auth"` | Session auth - redirect to `/login` or `401 JSON` |
+| `AuthMiddleware` | `"auth"` | Web session auth - redirect to `/login` (or custom redirect URL) |
 | `ApiAuthMiddleware` | `"apiauth"` | JWT auth - verify Bearer token, attach user to `request.user()`, `401` on failure |
 
 Both files are generated in `app/Middleware/` and can be customized freely. Because `ApiAuthMiddleware` attaches the authenticated user directly to the request context (`request.setUser(user)`), downstream authorization middlewares (such as `role:admin`, `can:ability`, and `permission:action`) work seamlessly without extra database queries.

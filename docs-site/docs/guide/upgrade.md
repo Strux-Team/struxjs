@@ -100,6 +100,8 @@ npm run dev
 
 - **Zero Breaking Changes**: Fully backward compatible with `1.0.11`.
 - **IoC Container Resolution for Default, Optional & Rest Parameters**: Resolved an issue where registering or resolving classes with default arguments (such as `Route.middleware(ApiAuthMiddleware)` or `Route.middleware(AuthMiddleware)`) threw `[StruxJS IoC Error]: Auto-injection failed for parameter 'defaultGuard="api"'`. The IoC container now properly detects parameters with default values (`= defaultValue`), optional modifiers (`?`), and rest parameters (`...args`), applying default parameter values automatically when no explicit container binding exists.
+- **`Auth.guard(name)` Facade & `AuthGuard` Interface**: `Auth.guard('web')` is now officially exposed with TypeScript type definitions, returning the corresponding `AuthGuard` driver for multi-guard scoping.
+- **Dedicated Web & API Separation for Middlewares**: Simplified `AuthMiddleware` to focus purely on web session authentication and redirect handling, while `ApiAuthMiddleware` handles stateless JWT verification and `401 Unauthorized` responses.
 
 ---
 
@@ -108,7 +110,7 @@ npm run dev
 ### Highlights
 
 - **Zero Breaking Changes**: Fully backward compatible with `1.0.10`.
-- **Middleware Constructor Arguments & Fluent Helpers**: All security middlewares (`CanMiddleware`, `RoleMiddleware`, `PermissionMiddleware`, `AuthMiddleware`, `ApiAuthMiddleware`) can now be passed as instantiated objects (`new CanMiddleware('edit-post')`) or via convenient fluent helpers (`can('edit-post')`, `role('admin')`, `permission('publish')`, `apiAuth('admin')`) without requiring container binding.
+- **Middleware Constructor Arguments & Fluent Helpers**: All security middlewares (`CanMiddleware`, `RoleMiddleware`, `PermissionMiddleware`, `AuthMiddleware`, `ApiAuthMiddleware`) can now be passed as instantiated objects (`new CanMiddleware('edit-post')`) or via convenient fluent helpers / static factories (`can('edit-post')`, `role('admin')`, `permission('publish')`, `ApiAuthMiddleware.guard('admin')`) without requiring container binding.
 - **ORM Model Primary Key `id` Accessor Fix**: Resolved an issue where model instances queried from the database had `id` evaluate to `undefined` due to modern ES2022 class field initialization. `BaseModel` now uses an ambient `declare id: any` declaration and Proxy-prioritized resolution for `id`, `_id`, and table primary keys.
 
 #### Recommended Update for Existing Projects: `ApiAuthMiddleware.ts`
