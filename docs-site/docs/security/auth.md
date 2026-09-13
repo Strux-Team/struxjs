@@ -163,6 +163,22 @@ Route.middleware("auth").group(() => {
 });
 ```
 
+#### Custom Redirect & Guard parameters
+
+You can pass a custom redirect URL or a specific guard name:
+
+```typescript
+// 1. Using Instance (Type-safe)
+Route.middleware(new AuthMiddleware("/admin/login", "admin")).group(() => {
+    Route.get("/admin/dashboard", [AdminController, "index"]);
+});
+
+// 2. Using String Alias: "auth:redirectUrl,guard"
+Route.middleware("auth:/admin/login,admin").group(() => {
+    Route.get("/admin/dashboard", [AdminController, "index"]);
+});
+```
+
 ---
 
 ## API Authentication (JWT)
@@ -277,7 +293,11 @@ Route.middleware("apiauth").group(() => {
 Pass a guard name to enforce that the token was issued for a specific guard. A token issued for the `admin` guard is rejected on an `api` route:
 
 ```typescript
-// "apiauth:admin" - only allows tokens with guard = "admin"
+// Option 1: Using Instance (Type-safe)
+Route.get("/admin/stats", [AdminController, "stats"])
+    .middleware(new ApiAuthMiddleware("admin"));
+
+// Option 2: Using String Alias
 Route.get("/admin/stats", [AdminController, "stats"])
     .middleware("apiauth:admin");
 ```

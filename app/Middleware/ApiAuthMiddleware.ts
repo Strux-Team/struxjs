@@ -14,7 +14,14 @@ import { Middleware, Auth } from "struxjs";
  *   Route.get('/admin/stats', 'AdminController@stats', { middlewares: ['apiauth:admin'] });
  */
 export class ApiAuthMiddleware implements Middleware {
-    public async handle(request: FastifyRequest, reply: FastifyReply, guard = "api"): Promise<void> {
+    constructor(private defaultGuard: string = "api") {}
+
+    public static guard(guardName: string): ApiAuthMiddleware {
+        return new ApiAuthMiddleware(guardName);
+    }
+
+    public async handle(request: FastifyRequest, reply: FastifyReply, guard?: string): Promise<void> {
+        const targetGuard = guard || this.defaultGuard;
         const authHeader = request.headers["authorization"];
 
         if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -43,15 +50,15 @@ export class ApiAuthMiddleware implements Middleware {
         }
 
         // Guard mismatch — e.g. using an 'admin' token on an 'api' route
-        if (payload.guard !== guard) {
+        if (payload.guard !== targetGuard) {
             reply.status(403).send({
-                message: `Forbidden. This route requires the '${guard}' guard.`
+                message: `Forbidden. This route requires the '${targetGuard}' guard.`
             });
             return;
         }
 
         // Token is valid — resolve user and attach to request context for downstream middlewares & controllers
-        const user = await Auth.jwt().user(guard);
+        const user = await Auth.jwt().user(targetGuard);
         if (!user) {
             reply.status(401).send({
                 message: "Unauthenticated. User not found."
@@ -65,5 +72,9 @@ export class ApiAuthMiddleware implements Middleware {
         } else {
             req._authUser = user;
         }
+    }
+
+    public toString(): string {
+        return this.defaultGuard !== "api" ? `apiauth:${this.defaultGuard}` : "ApiAuthMiddleware";
     }
 }
